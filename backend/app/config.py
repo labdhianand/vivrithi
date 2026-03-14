@@ -1,0 +1,83 @@
+from __future__ import annotations
+
+from functools import lru_cache
+from pathlib import Path
+
+from pydantic import Field, field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+ROOT_DIR = Path(__file__).resolve().parents[2]
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=(ROOT_DIR / ".env", ROOT_DIR / "backend" / ".env"),
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+    app_name: str = "Intelli-Credit Copilot API"
+    app_env: str = "development"
+    app_url: str = "http://localhost:8000"
+    cors_origins: list[str] = Field(
+        default_factory=lambda: [
+            "http://localhost:3000",
+            "http://localhost:3001",
+            "http://127.0.0.1:3000",
+            "http://127.0.0.1:3001",
+        ]
+    )
+
+    database_url: str = Field(
+        default=f"sqlite+aiosqlite:///{(ROOT_DIR / 'backend' / 'app.db').as_posix()}"
+    )
+
+    storage_root: Path = ROOT_DIR / "backend" / "storage"
+    storage_bucket: str = "intelli-credit-docs"
+    document_processing_backend: str = "docling_remote"
+    document_processing_max_workers: int = 8
+    document_batch_max_concurrency: int = 4
+
+    docling_remote_host: str | None = None
+    docling_remote_port: int = 22
+    docling_remote_username: str | None = None
+    docling_remote_password: str | None = None
+    docling_remote_client_key_path: str | None = None
+    docling_remote_known_hosts: str | None = None
+    docling_remote_python_bin: str = "python3.10"
+    docling_remote_workspace: str = "~/.intelli_credit_docling"
+    docling_remote_venv: str = "~/.intelli_credit_docling/.venv"
+    docling_remote_enable_bootstrap: bool = True
+    docling_remote_bootstrap_torch_index_url: str = "https://download.pytorch.org/whl/cu128"
+    docling_remote_page_batch_size: int = 128
+    docling_remote_layout_batch_size: int = 128
+    docling_remote_ocr_batch_size: int = 96
+    docling_remote_table_batch_size: int = 4
+    docling_remote_document_timeout_seconds: int = 1800
+
+    gemini_api_key: str | None = None
+    gemini_text_model: str = "gemini-2.5-flash"
+    gemini_vision_model: str = "gemini-2.5-flash"
+    gemini_context_char_limit: int = 200_000
+    classification_require_llm: bool = True
+    landing_ai_api_key: str | None = None
+    tavily_api_key: str | None = None
+    supabase_url: str | None = None
+    supabase_key: str | None = None
+
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def normalize_database_url(cls, value: str) -> str:
+        if value.startswith("sqlite:///"):
+            return value.replace("sqlite:///", "sqlite+aiosqlite:///", 1)
+        if value.startswith("postgresql://"):
+            return value.replace("postgresql://", "postgresql+asyncpg://", 1)
+        if value.startswith("postgres://"):
+            return value.replace("postgres://", "postgresql+asyncpg://", 1)
+        return value
+
+
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()

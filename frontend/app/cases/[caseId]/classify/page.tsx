@@ -1,0 +1,161 @@
+"use client";
+
+import { useEffect, useState } from "react";
+
+import { approveClassification, listDocuments, processCaseDocuments } from "@/lib/api";
+import type { DocumentRecord } from "@/lib/types";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { ClassificationCard } from "@/components/classification/classification-card";
+
+const TERMINAL_STATUSES = new Set(["extracted", "completed", "failed"]);
+const ACTIVE_STATUSES = new Set(["queued", "triaging", "parsing", "extracting", "processing"]);
+
+export default function ClassificationPage({ params }: { params: { caseId: string } }) {
+  const [documents, setDocuments] = useState<DocumentRecord[]>([]);
+  const [processing, setProcessing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = () => listDocuments(params.caseId).then(setDocuments).catch((err) => setError(err.message));
+  const startProcessing = async () => {
+    setProcessing(true);
+    setError(null);
+    await processCaseDocuments(params.caseId);
+    await refresh();
+  };
+
+  useEffect(() => {
+    refresh();
+  }, [params.caseId]);
+
+  const classifiedCount = documents.filter((d) => d.auto_category || d.user_category).length;
+  const finishedCount = documents.filter((d) => TERMINAL_STATUSES.has(d.processing_status)).length;
+
+  useEffect(() => {
+    if (!processing) {
+      return;
+    }
+    const intervalId = window.setInterval(() => {
+      refresh();
+    }, 3000);
+    return () => window.clearInterval(intervalId);
+  }, [processing, params.caseId]);
+
+  useEffect(() => {
+    if (processing && documents.length > 0 && documents.every((d) => TERMINAL_STATUSES.has(d.processing_status))) {
+      setProcessing(false);
+    }
+  }, [documents, processing]);
+
+  useEffect(() => {
+    if (documents.length === 0) {
+      return;
+    }
+    const hasPending = documents.some((d) => d.processing_status === "pending");
+    const hasActive = documents.some((d) => ACTIVE_STATUSES.has(d.processing_status));
+    if (hasActive && !processing) {
+      setProcessing(true);
+      return;
+    }
+    if (hasPending && !processing) {
+      startProcessing().catch((err) => {
+        setError(err instanceof Error ? err.message : "Processing failed");
+        setProcessing(false);
+      });
+    }
+  }, [documents, processing, params.caseId]);
+
+  const sortedDocuments = [...documents].sort((left, right) => {
+    const leftReady = ["extracted", "completed"].includes(left.processing_status) && !["approved", "user_approved"].includes(left.classification_status);
+    const rightReady = ["extracted", "completed"].includes(right.processing_status) && !["approved", "user_approved"].includes(right.classification_status);
+    if (leftReady !== rightReady) {
+      return leftReady ? -1 : 1;
+    }
+    const leftActive = !TERMINAL_STATUSES.has(left.processing_status);
+    const rightActive = !TERMINAL_STATUSES.has(right.processing_status);
+    if (leftActive !== rightActive) {
+      return leftActive ? 1 : -1;
+    }
+    return new Date(right.updated_at).getTime() - new Date(left.updated_at).getTime();
+  });
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="animate-fade-in flex items-center justify-between">
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-dim">
+            Classification
+          </p>
+          <h2 className="mt-1 text-lg font-semibold text-slate-bright">
+            Document Classification
+          </h2>
+          <p className="mt-1.5 text-sm text-slate-dim">
+            {processing
+              ? `${finishedCount} of ${documents.length} documents finished`
+              : `${classifiedCount} of ${documents.length} documents classified`}
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <Badge tone={classifiedCount === documents.length && documents.length > 0 ? "success" : "warn"}>
+            {classifiedCount}/{documents.length}
+          </Badge>
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={processing || documents.length === 0}
+            onClick={async () => {
+              try {
+                await startProcessing();
+              } catch (err) {
+                setError(err instanceof Error ? err.message : "Processing failed");
+                setProcessing(false);
+              }
+            }}
+          >
+            {processing ? "Processing in background..." : "Process all in parallel"}
+          </Button>
+        </div>
+      </div>
+
+      {processing && (
+        <div className="panel p-4 animate-fade-in">
+          <p className="text-sm text-slate">
+            Processing has started. This page refreshes document statuses every few seconds.
+          </p>
+        </div>
+      )}
+
+      {/* Classification cards */}
+      <div className="grid gap-4">
+        {sortedDocuments.map((document, index) => (
+          <div
+            key={document.id}
+            className={`animate-slide-up stagger-${Math.min(index + 1, 6)}`}
+          >
+            <ClassificationCard
+              document={document}
+              onApprove={async (category) => {
+                await approveClassification(document.id, category);
+                await refresh();
+              }}
+            />
+          </div>
+        ))}
+
+        {documents.length === 0 && (
+          <div className="panel p-10 text-center animate-fade-in">
+            <p className="text-sm text-slate-dim">No documents uploaded yet. Upload documents first.</p>
+          </div>
+        )}
+      </div>
+
+      {/* Error display */}
+      {error && (
+        <div className="animate-fade-in panel border-rose/20 p-4">
+          <span className="text-sm text-rose-glow">{error}</span>
+        </div>
+      )}
+    </div>
+  );
+}

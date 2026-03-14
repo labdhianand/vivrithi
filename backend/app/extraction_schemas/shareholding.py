@@ -1,0 +1,45 @@
+SHAREHOLDING_DEFAULT_SCHEMA = {
+    "category": "Shareholding_Pattern",
+    "fields": [
+        {"key": "reporting_quarter", "label": "Reporting Quarter", "type": "text", "required": True},
+        {"key": "company_name", "label": "Company Name", "type": "text"},
+        {"key": "scrip_code", "label": "Scrip Code (BSE)", "type": "text"},
+        {"key": "nse_symbol", "label": "NSE Symbol", "type": "text"},
+        {"key": "isin", "label": "ISIN", "type": "text"},
+        {"key": "total_shares", "label": "Total Shares", "type": "number", "required": True},
+        {
+            "key": "promoter_holding_percent",
+            "label": "Promoter & Promoter Group (%)",
+            "type": "percentage",
+            "required": True,
+        },
+        {"key": "promoter_shares", "label": "Promoter Shares", "type": "number"},
+        {"key": "promoter_name", "label": "Key Promoter Name", "type": "text"},
+        {
+            "key": "public_holding_percent",
+            "label": "Public Shareholding (%)",
+            "type": "percentage",
+            "required": True,
+        },
+        {"key": "fpi_holding_percent", "label": "Foreign Portfolio Investors (%)", "type": "percentage"},
+        {"key": "mutual_fund_holding_percent", "label": "Mutual Funds (%)", "type": "percentage"},
+        {"key": "insurance_holding_percent", "label": "Insurance Companies (%)", "type": "percentage"},
+        {"key": "dii_holding_percent", "label": "Domestic Institutional Investors (%)", "type": "percentage"},
+        {"key": "retail_holding_percent", "label": "Retail Investors (%)", "type": "percentage"},
+        {"key": "shares_pledged_percent", "label": "Shares Pledged (% of promoter)", "type": "percentage"},
+        {"key": "shares_under_ndu", "label": "Shares Under Non-Disposal Undertaking", "type": "number"},
+        {"key": "esop_outstanding", "label": "ESOPs Outstanding", "type": "number"},
+        {
+            "key": "foreign_ownership_limit_utilized",
+            "label": "Foreign Ownership Limit Utilized (%)",
+            "type": "percentage",
+        },
+        {
+            "key": "top_shareholders",
+            "label": "Top Shareholders",
+            "type": "json",
+            "description": "Array of {name, shares, percent}",
+        },
+    ],
+}
+

@@ -1,0 +1,38 @@
+ANNUAL_REPORT_DEFAULT_SCHEMA = {
+    "category": "Annual_Report",
+    "fields": [
+        {"key": "fiscal_year", "label": "Fiscal Year", "type": "text", "required": True},
+        {"key": "aum_crore", "label": "Assets Under Management (crore)", "type": "currency_crore"},
+        {"key": "net_worth_crore", "label": "Net Worth (crore)", "type": "currency_crore"},
+        {"key": "total_revenue_crore", "label": "Total Revenue (crore)", "type": "currency_crore"},
+        {"key": "pat_crore", "label": "Profit After Tax (crore)", "type": "currency_crore"},
+        {"key": "disbursements_crore", "label": "Disbursements (crore)", "type": "currency_crore"},
+        {"key": "roe_percent", "label": "Return on Equity (%)", "type": "percentage"},
+        {"key": "roa_percent", "label": "Return on Assets (%)", "type": "percentage"},
+        {"key": "nim_percent", "label": "Net Interest Margin (%)", "type": "percentage"},
+        {"key": "spread_percent", "label": "Spread (%)", "type": "percentage"},
+        {"key": "eps", "label": "Earnings Per Share (Rs.)", "type": "number"},
+        {"key": "branch_count", "label": "Number of Branches", "type": "number"},
+        {"key": "employee_count", "label": "Number of Employees", "type": "number"},
+        {"key": "customer_count", "label": "Number of Customers", "type": "number"},
+        {"key": "states_present", "label": "States of Presence", "type": "number"},
+        {"key": "housing_loan_percent", "label": "Housing Loan % of Book", "type": "percentage"},
+        {"key": "non_housing_loan_percent", "label": "Non-Housing Loan % of Book", "type": "percentage"},
+        {"key": "auditor_name", "label": "Statutory Auditor", "type": "text"},
+        {"key": "auditor_qualification", "label": "Auditor Qualification/Emphasis", "type": "text"},
+        {"key": "board_composition", "label": "Board Composition Summary", "type": "text"},
+        {
+            "key": "key_risks_mentioned",
+            "label": "Key Risks Mentioned",
+            "type": "json",
+            "description": "Array of risk statements from MD&A / Risk Management section",
+        },
+        {"key": "related_party_transactions", "label": "Material Related Party Transactions", "type": "text"},
+        {
+            "key": "contingent_liabilities_crore",
+            "label": "Contingent Liabilities (crore)",
+            "type": "currency_crore",
+        },
+    ],
+}
+
