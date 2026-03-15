@@ -155,6 +155,10 @@ def test_process_document_docling_remote_persists_pages_and_extractions(tmp_path
                     bbox=(0.1, 0.2, 0.5, 0.3),
                     extraction_method="heuristic_text",
                     extraction_note=None,
+                    sheet_name="Performance",
+                    row_label="GNPA",
+                    column_header="Value",
+                    cell_reference="B2",
                 )
             ]
 
@@ -213,6 +217,10 @@ def test_process_document_docling_remote_persists_pages_and_extractions(tmp_path
             assert len(extractions) == 1
             assert extractions[0].schema_field_key == "gnpa_percent"
             assert float(extractions[0].bbox_x1) == 0.1
+            assert extractions[0].sheet_name == "Performance"
+            assert extractions[0].row_label == "GNPA"
+            assert extractions[0].column_header == "Value"
+            assert extractions[0].cell_reference == "B2"
             assert case.status == "extracted"
 
         await engine.dispose()

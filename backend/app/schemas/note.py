@@ -21,3 +21,15 @@ class AnalystNoteRead(AnalystNoteCreate):
     created_at: datetime
     updated_at: datetime
 
+
+class AnalystNoteInterpretRequest(BaseModel):
+    note_type: str | None = None
+    content: str
+
+
+class AnalystNoteInterpretRead(BaseModel):
+    affected_c: str
+    sentiment: str
+    risk_adjustment: int
+    rationale: str
+    signals: list[str]

@@ -11,7 +11,9 @@ import { Button } from "@/components/ui/button";
 export default function ResearchPage({ params }: { params: { caseId: string } }) {
   const [items, setItems] = useState<ResearchItem[]>([]);
   const [busy, setBusy] = useState(false);
-  const [filter, setFilter] = useState<string>("all");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [scopeFilter, setScopeFilter] = useState<string>("all");
 
   const refresh = () => listResearch(params.caseId).then(setItems).catch(() => setItems([]));
 
@@ -20,14 +22,31 @@ export default function ResearchPage({ params }: { params: { caseId: string } })
   }, [params.caseId]);
 
   const categories = Array.from(new Set(items.map((i) => i.category))).filter(Boolean);
+  const statuses = Array.from(new Set(items.map((i) => i.verification_status).filter(Boolean))) as string[];
+  const scopes = Array.from(new Set(items.map((i) => i.entity_scope).filter(Boolean))) as string[];
 
-  const filtered = filter === "all" ? items : items.filter((i) => i.category === filter);
+  const filtered = items.filter((item) => {
+    if (categoryFilter !== "all" && item.category !== categoryFilter) return false;
+    if (statusFilter !== "all" && item.verification_status !== statusFilter) return false;
+    if (scopeFilter !== "all" && item.entity_scope !== scopeFilter) return false;
+    return true;
+  });
 
   const sentimentCounts = {
     positive: items.filter((i) => i.sentiment === "positive").length,
     negative: items.filter((i) => i.sentiment === "negative").length,
     neutral: items.filter((i) => i.sentiment !== "positive" && i.sentiment !== "negative").length,
   };
+  const verifiedBorrowerCount = items.filter(
+    (i) =>
+      ["verified", "probable"].includes(i.verification_status || "") &&
+      ["borrower", "promoter"].includes(i.entity_scope || ""),
+  ).length;
+  const contextualCount = items.filter(
+    (i) =>
+      ["verified", "probable", "contextual"].includes(i.verification_status || "") &&
+      ["sector", "macro"].includes(i.entity_scope || ""),
+  ).length;
 
   return (
     <div className="space-y-6">
@@ -69,7 +88,15 @@ export default function ResearchPage({ params }: { params: { caseId: string } })
 
       {/* Stats row */}
       {items.length > 0 && (
-        <div className="grid grid-cols-3 gap-4 animate-slide-up stagger-1">
+        <div className="grid gap-4 md:grid-cols-5 animate-slide-up stagger-1">
+          <div className="panel p-5 text-center">
+            <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-dim">Verified Borrower</p>
+            <p className="mt-2 text-2xl font-bold text-accent-glow">{verifiedBorrowerCount}</p>
+          </div>
+          <div className="panel p-5 text-center">
+            <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-dim">Contextual</p>
+            <p className="mt-2 text-2xl font-bold text-gold-glow">{contextualCount}</p>
+          </div>
           <div className="panel p-5 text-center">
             <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-dim">Positive</p>
             <p className="mt-2 text-2xl font-bold text-emerald-glow">{sentimentCounts.positive}</p>
@@ -85,32 +112,84 @@ export default function ResearchPage({ params }: { params: { caseId: string } })
         </div>
       )}
 
-      {/* Category filters */}
+      {/* Filters */}
       {categories.length > 0 && (
-        <div className="flex flex-wrap gap-2 animate-slide-up stagger-2">
-          <button
-            onClick={() => setFilter("all")}
-            className={`rounded-lg border px-3 py-1.5 text-xs font-medium uppercase tracking-wider transition-all duration-200 ${
-              filter === "all"
-                ? "border-accent/40 bg-accent/15 text-accent-glow"
-                : "border-white/[0.08] bg-surface-200 text-slate-dim hover:text-slate hover:border-white/[0.12]"
-            }`}
-          >
-            All ({items.length})
-          </button>
-          {categories.map((cat) => (
+        <div className="space-y-3 animate-slide-up stagger-2">
+          <div className="flex flex-wrap gap-2">
             <button
-              key={cat}
-              onClick={() => setFilter(cat)}
+              onClick={() => setCategoryFilter("all")}
               className={`rounded-lg border px-3 py-1.5 text-xs font-medium uppercase tracking-wider transition-all duration-200 ${
-                filter === cat
+                categoryFilter === "all"
                   ? "border-accent/40 bg-accent/15 text-accent-glow"
                   : "border-white/[0.08] bg-surface-200 text-slate-dim hover:text-slate hover:border-white/[0.12]"
               }`}
             >
-              {cat} ({items.filter((i) => i.category === cat).length})
+              All Categories ({items.length})
             </button>
-          ))}
+            {categories.map((cat) => (
+              <button
+                key={cat}
+                onClick={() => setCategoryFilter(cat)}
+                className={`rounded-lg border px-3 py-1.5 text-xs font-medium uppercase tracking-wider transition-all duration-200 ${
+                  categoryFilter === cat
+                    ? "border-accent/40 bg-accent/15 text-accent-glow"
+                    : "border-white/[0.08] bg-surface-200 text-slate-dim hover:text-slate hover:border-white/[0.12]"
+                }`}
+              >
+                {cat} ({items.filter((i) => i.category === cat).length})
+              </button>
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setStatusFilter("all")}
+              className={`rounded-lg border px-3 py-1.5 text-xs font-medium uppercase tracking-wider transition-all duration-200 ${
+                statusFilter === "all"
+                  ? "border-gold/40 bg-gold/15 text-gold-glow"
+                  : "border-white/[0.08] bg-surface-200 text-slate-dim hover:text-slate hover:border-white/[0.12]"
+              }`}
+            >
+              All Statuses
+            </button>
+            {statuses.map((status) => (
+              <button
+                key={status}
+                onClick={() => setStatusFilter(status)}
+                className={`rounded-lg border px-3 py-1.5 text-xs font-medium uppercase tracking-wider transition-all duration-200 ${
+                  statusFilter === status
+                    ? "border-gold/40 bg-gold/15 text-gold-glow"
+                    : "border-white/[0.08] bg-surface-200 text-slate-dim hover:text-slate hover:border-white/[0.12]"
+                }`}
+              >
+                {status} ({items.filter((i) => i.verification_status === status).length})
+              </button>
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setScopeFilter("all")}
+              className={`rounded-lg border px-3 py-1.5 text-xs font-medium uppercase tracking-wider transition-all duration-200 ${
+                scopeFilter === "all"
+                  ? "border-emerald/40 bg-emerald/15 text-emerald-glow"
+                  : "border-white/[0.08] bg-surface-200 text-slate-dim hover:text-slate hover:border-white/[0.12]"
+              }`}
+            >
+              All Scopes
+            </button>
+            {scopes.map((scope) => (
+              <button
+                key={scope}
+                onClick={() => setScopeFilter(scope)}
+                className={`rounded-lg border px-3 py-1.5 text-xs font-medium uppercase tracking-wider transition-all duration-200 ${
+                  scopeFilter === scope
+                    ? "border-emerald/40 bg-emerald/15 text-emerald-glow"
+                    : "border-white/[0.08] bg-surface-200 text-slate-dim hover:text-slate hover:border-white/[0.12]"
+                }`}
+              >
+                {scope} ({items.filter((i) => i.entity_scope === scope).length})
+              </button>
+            ))}
+          </div>
         </div>
       )}
 

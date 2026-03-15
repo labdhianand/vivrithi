@@ -33,6 +33,10 @@ class StorageService:
         absolute_path = self.absolute_path(relative_path)
         absolute_path.parent.mkdir(parents=True, exist_ok=True)
         content = await file.read()
+        if len(content) > self.settings.max_upload_size_bytes:
+            raise ValueError(
+                f"Upload exceeds max size of {self.settings.max_upload_size_mb} MB: {safe_name}"
+            )
         absolute_path.write_bytes(content)
         return {
             "relative_path": relative_path,
@@ -58,4 +62,3 @@ class StorageService:
 
 
 storage = StorageService()
-

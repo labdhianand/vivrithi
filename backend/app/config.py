@@ -35,6 +35,7 @@ class Settings(BaseSettings):
 
     storage_root: Path = ROOT_DIR / "backend" / "storage"
     storage_bucket: str = "intelli-credit-docs"
+    max_upload_size_mb: int = 50
     document_processing_backend: str = "docling_remote"
     document_processing_max_workers: int = 8
     document_batch_max_concurrency: int = 4
@@ -63,8 +64,24 @@ class Settings(BaseSettings):
     classification_require_llm: bool = True
     landing_ai_api_key: str | None = None
     tavily_api_key: str | None = None
+    firecrawl_api_key: str | None = None
+    firecrawl_base_url: str = "https://api.firecrawl.dev/v2"
+    research_max_results: int = 18
+    research_timeout_seconds: float = 20.0
+    research_min_entity_match_score: float = 0.55
+    research_contextual_match_score: float = 0.30
+    research_max_pages_to_scrape: int = 16
+    sentry_dsn: str | None = None
+    request_id_header: str = "X-Request-ID"
+    databricks_host: str | None = None
+    databricks_token: str | None = None
+    databricks_warehouse_id: str | None = None
+    databricks_catalog: str | None = None
+    databricks_schema: str | None = None
+    databricks_timeout_seconds: float = 30.0
     supabase_url: str | None = None
     supabase_key: str | None = None
+    api_key: str = ""
 
     @field_validator("database_url", mode="before")
     @classmethod
@@ -76,6 +93,10 @@ class Settings(BaseSettings):
         if value.startswith("postgres://"):
             return value.replace("postgres://", "postgresql+asyncpg://", 1)
         return value
+
+    @property
+    def max_upload_size_bytes(self) -> int:
+        return self.max_upload_size_mb * 1024 * 1024
 
 
 @lru_cache

@@ -19,6 +19,7 @@ class ParsedTable:
     bbox: tuple[float, float, float, float]
     rows: list[list[str | None]]
     markdown: str
+    sheet_name: str | None = None
 
 
 @dataclass(slots=True)
@@ -51,4 +52,7 @@ class ExtractionResult:
     bbox: tuple[float, float, float, float] | None
     extraction_method: str
     extraction_note: str | None = None
-
+    sheet_name: str | None = None
+    row_label: str | None = None
+    column_header: str | None = None
+    cell_reference: str | None = None

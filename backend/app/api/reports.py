@@ -75,6 +75,7 @@ async def generate_report(case_id: str, session: AsyncSession = Depends(get_sess
         "recommended_tenure_months": score.recommended_tenure_months,
         "decision_reasoning": score.decision_reasoning or "",
         "key_risks": score.key_risks or [],
+        "improvement_scenarios": score.improvement_scenarios or [],
     }
     five_cs = _rebuild_five_cs(score)
     for c_name in ["character", "capacity", "capital", "collateral", "conditions"]:
@@ -133,4 +134,3 @@ async def download_report(report_id: str, format: str, session: AsyncSession = D
     if not absolute_path.exists():
         raise HTTPException(status_code=404, detail="Report file not found")
     return FileResponse(absolute_path, filename=f"{report_id}.{format}")
-

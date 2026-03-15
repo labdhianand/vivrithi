@@ -12,8 +12,22 @@ def extraction(key: str, numeric: str | None = None, text: str | None = None):
     )
 
 
-def research(category: str, severity: str, sentiment: str = "neutral", title: str = "signal"):
-    return SimpleNamespace(category=category, severity=severity, sentiment=sentiment, title=title)
+def research(
+    category: str,
+    severity: str,
+    sentiment: str = "neutral",
+    title: str = "signal",
+    verification_status: str | None = None,
+    entity_scope: str | None = None,
+):
+    return SimpleNamespace(
+        category=category,
+        severity=severity,
+        sentiment=sentiment,
+        title=title,
+        verification_status=verification_status,
+        entity_scope=entity_scope,
+    )
 
 
 def note(affected_c: str, risk_adjustment: int, note_type: str = "note", content: str = "analyst comment"):
@@ -49,3 +63,22 @@ def test_score_five_cs_returns_reasonable_scores() -> None:
     assert result["character"].score > 60
     assert result["capacity"].score > 70
 
+
+def test_score_five_cs_ignores_unverified_legal_signal() -> None:
+    extractions = [
+        extraction("profit_after_tax", "17004.57"),
+        extraction("gnpa_percent", "1.19"),
+        extraction("nnpa_percent", "0.79"),
+        extraction("crar_percent", "46.39"),
+        extraction("net_worth_lakhs", "485813.55"),
+    ]
+    research_items = [
+        research("legal", "high", title="Generic NCLT page", verification_status="unverified", entity_scope="generic"),
+        research("legal", "high", title="Borrower legal finding", verification_status="verified", entity_scope="borrower"),
+    ]
+
+    result = score_five_cs(extractions, research_items, notes=[])
+
+    character_factors = __import__("json").loads(result["character"].reasoning)["factors"]
+    adverse_factor = next(factor for factor in character_factors if factor["signal"] == "Adverse promoter or legal news")
+    assert adverse_factor["impact"] == -5

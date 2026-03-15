@@ -15,6 +15,22 @@ from ..services.document_pipeline import process_document
 router = APIRouter()
 
 
+def _derive_correction_type(extraction: Extraction, payload: ExtractionUpdate) -> str | None:
+    if payload.correction_type:
+        return payload.correction_type
+    edited_value = payload.user_edited_value
+    if edited_value is not None:
+        baseline = payload.value if payload.value is not None else extraction.value
+        if edited_value == "":
+            return "override_cleared"
+        if baseline != edited_value:
+            return "value_changed"
+        return "verified_no_change"
+    if payload.user_verified:
+        return "verified_no_change"
+    return extraction.correction_type
+
+
 @router.get("/documents/{doc_id}/extractions", response_model=list[ExtractionRead])
 async def list_document_extractions(doc_id: str, session: AsyncSession = Depends(get_session)) -> list[Extraction]:
     result = await session.execute(
@@ -37,6 +53,7 @@ async def update_extraction(
     if payload.user_edited_value is not None:
         extraction.user_edited_value = payload.user_edited_value
     extraction.user_verified = payload.user_verified
+    extraction.correction_type = _derive_correction_type(extraction, payload)
     await session.commit()
     await session.refresh(extraction)
     return extraction

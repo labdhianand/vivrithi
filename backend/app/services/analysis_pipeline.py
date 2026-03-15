@@ -12,9 +12,9 @@ from ..models.document import Document
 from ..models.extraction import Extraction
 from ..models.research import ResearchItem
 from ..models.score import Score
-from .cross_verifier import cross_verify
+from .cross_verifier import cross_verify, llm_triangulate
 from .five_cs_scorer import score_five_cs
-from .ml_scorer import predict_default_probability
+from .ml_scorer import get_model_metadata, predict_default_probability
 from .recommendation import generate_recommendation
 from .research_agent import run_secondary_research
 from .swot_generator import generate_swot
@@ -53,12 +53,18 @@ async def run_case_analysis(session: AsyncSession, case: Case, notes: list) -> S
             (item.value for item in extractions if item.schema_field_key == "nse_symbol" and item.value),
             None,
         )
-        for payload in await run_secondary_research(case, nse_symbol=nse_symbol):
+        for payload in await run_secondary_research(case, nse_symbol=nse_symbol, extractions=extractions):
             session.add(ResearchItem(case_id=case.id, **payload))
         await session.commit()
         research_items = await _get_research(session, case.id)
 
     cross_checks = cross_verify(case.id, documents, extractions)
+    # LLM triangulation: additive checks, never removes existing ones
+    try:
+        llm_checks = llm_triangulate(case.id, extractions, research_items)
+        cross_checks.extend(llm_checks)
+    except Exception as exc:
+        logger.warning(f"LLM triangulation failed for case {case.id}: {exc}")
     await session.execute(delete(CrossVerification).where(CrossVerification.case_id == case.id))
     for check in cross_checks:
         session.add(CrossVerification(**check))
@@ -85,6 +91,13 @@ async def run_case_analysis(session: AsyncSession, case: Case, notes: list) -> S
         )
     except Exception as exc:
         logger.warning(f"ML scoring failed for case {case.id}: {exc}")
+
+    # Attach model metadata to ML prediction for transparency
+    if ml_prediction:
+        try:
+            ml_prediction["model_metadata"] = get_model_metadata()
+        except Exception:
+            pass
 
     recommendation = generate_recommendation(
         case, five_cs, cross_checks, research_items, ml_prediction=ml_prediction
@@ -119,6 +132,7 @@ async def run_case_analysis(session: AsyncSession, case: Case, notes: list) -> S
     score.conditions_precedent = recommendation["conditions_precedent"]
     score.conditions_subsequent = recommendation["conditions_subsequent"]
     score.monitoring_covenants = recommendation["monitoring_covenants"]
+    score.improvement_scenarios = recommendation.get("improvement_scenarios") or []
     score.swot = swot
     case.status = "analyzing"
 

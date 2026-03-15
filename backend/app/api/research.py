@@ -21,6 +21,10 @@ async def run_research(case_id: str, session: AsyncSession = Depends(get_session
     case = await session.get(Case, case_id)
     if not case:
         raise HTTPException(status_code=404, detail="Case not found")
+    extractions_result = await session.execute(
+        select(Extraction).join(Document, Document.id == Extraction.document_id).where(Document.case_id == case_id)
+    )
+    extractions = list(extractions_result.scalars().all())
     extraction_result = await session.execute(
         select(Extraction.value)
         .join(Document, Document.id == Extraction.document_id)
@@ -28,7 +32,7 @@ async def run_research(case_id: str, session: AsyncSession = Depends(get_session
     )
     nse_symbol = extraction_result.scalars().first()
     await session.execute(delete(ResearchItem).where(ResearchItem.case_id == case_id))
-    for payload in await run_secondary_research(case, nse_symbol=nse_symbol):
+    for payload in await run_secondary_research(case, nse_symbol=nse_symbol, extractions=extractions):
         session.add(ResearchItem(case_id=case_id, **payload))
     await session.commit()
     result = await session.execute(
@@ -53,4 +57,3 @@ async def delete_research_item(item_id: str, session: AsyncSession = Depends(get
     await session.delete(item)
     await session.commit()
     return {"message": "Research item deleted"}
-

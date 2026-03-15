@@ -62,6 +62,8 @@ export function ExtractedDataTable({
         {extractions.map((entry, index) => {
           const isActive = activeExtractionId === entry.id;
           const isEdited = entry.user_verified;
+          const isMissingRequired = entry.extraction_method === "missing_required";
+          const isMissing = !entry.user_edited_value && !entry.value;
           return (
             <div
               key={entry.id}
@@ -83,21 +85,48 @@ export function ExtractedDataTable({
                       {entry.field_label || entry.schema_field_key}
                     </span>
                     {isEdited && <Badge tone="success">Verified</Badge>}
+                    {isMissingRequired && <Badge tone="danger">Required Missing</Badge>}
                   </div>
                   <p className="mt-0.5 text-[10px] font-bold uppercase tracking-[0.25em] text-slate-dim">
                     {entry.value_type}
                   </p>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    {entry.source_page_number && (
+                      <Badge tone="info">Page {entry.source_page_number}</Badge>
+                    )}
+                    {entry.extraction_method && (
+                      <Badge tone="neutral">{entry.extraction_method}</Badge>
+                    )}
+                    {(entry.bbox_x1 || entry.bbox_y1 || entry.bbox_x2 || entry.bbox_y2) && (
+                      <Badge tone="neutral">Boxed</Badge>
+                    )}
+                  </div>
                 </div>
                 <ConfidenceBadge confidence={entry.confidence} />
               </div>
+
+              {isMissingRequired && (
+                <div className="mt-3 rounded-xl border border-rose-400/20 bg-rose-500/[0.08] px-3 py-2 text-sm text-rose-100">
+                  This compulsory field could not be extracted reliably from the source document and needs manual review.
+                </div>
+              )}
 
               <div className="mt-3 flex items-end gap-3">
                 <div className="flex-1">
                   <Input
                     value={drafts[entry.id] || ""}
+                    placeholder={isMissing ? "No extracted value" : undefined}
                     onChange={(event) => setDrafts((current) => ({ ...current, [entry.id]: event.target.value }))}
                   />
                 </div>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  disabled={!entry.source_page_number}
+                  onClick={() => onHighlight?.(entry.id)}
+                >
+                  Locate
+                </Button>
                 <Button
                   variant="primary"
                   size="sm"

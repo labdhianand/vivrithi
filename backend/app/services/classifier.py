@@ -9,6 +9,46 @@ from ..config import get_settings
 from .llm_text import generate_json, has_text_llm
 from .types import ClassificationResult
 
+ALLOWED_CATEGORIES = (
+    "ALM",
+    "Shareholding_Pattern",
+    "Borrowing_Profile",
+    "Annual_Report",
+    "Portfolio_Performance",
+    "GST_Returns",
+    "Bank_Statement",
+)
+
+CATEGORY_ALIASES = {
+    "alm": "ALM",
+    "asset liability management": "ALM",
+    "shareholding pattern": "Shareholding_Pattern",
+    "shareholding": "Shareholding_Pattern",
+    "borrowing profile": "Borrowing_Profile",
+    "credit rating": "Borrowing_Profile",
+    "annual report": "Annual_Report",
+    "integrated report": "Annual_Report",
+    "portfolio performance": "Portfolio_Performance",
+    "portfolio cuts": "Portfolio_Performance",
+    "financial results": "Portfolio_Performance",
+    "gst returns": "GST_Returns",
+    "gst return": "GST_Returns",
+    "gstr": "GST_Returns",
+    "bank statement": "Bank_Statement",
+    "bank statements": "Bank_Statement",
+    "account statement": "Bank_Statement",
+}
+
+CONFIDENCE_ALIASES = {
+    "very_high": 0.95,
+    "high": 0.9,
+    "strong": 0.88,
+    "medium": 0.7,
+    "moderate": 0.7,
+    "low": 0.45,
+    "very_low": 0.25,
+}
+
 
 CATEGORY_PATTERNS = {
     "ALM": [
@@ -61,6 +101,25 @@ CATEGORY_PATTERNS = {
         r"district",
         r"portfolio",
     ],
+    "GST_Returns": [
+        r"\bgstr?\b",
+        r"\bgstin\b",
+        r"goods and services tax",
+        r"input tax credit",
+        r"tax liability",
+        r"taxable turnover",
+        r"filing period",
+    ],
+    "Bank_Statement": [
+        r"bank statement",
+        r"account statement",
+        r"opening balance",
+        r"closing balance",
+        r"total credits",
+        r"total debits",
+        r"average.*balance",
+        r"transaction.*summary",
+    ],
 }
 
 FILENAME_PATTERNS = {
@@ -95,6 +154,16 @@ FILENAME_PATTERNS = {
         r"q[1-4].*fy",
         r"results",
     ],
+    "GST_Returns": [
+        r"gst",
+        r"gstr",
+        r"gstin",
+    ],
+    "Bank_Statement": [
+        r"bank[_ -]?statement",
+        r"account[_ -]?statement",
+        r"statement",
+    ],
 }
 
 PAGE_SIGNAL_PATTERNS = {
@@ -118,6 +187,43 @@ PAGE_SIGNAL_PATTERNS = {
         "financial_table": 1.4,
         "narrative": 0.5,
     },
+}
+
+STRONG_SIGNAL_PATTERNS = {
+    "ALM": [
+        r"liquidity coverage ratio",
+        r"\blcr\b",
+        r"high quality liquid assets",
+        r"net cash outflows",
+        r"asset liability management committee",
+    ],
+    "Shareholding_Pattern": [
+        r"shareholding pattern",
+        r"regulation 31",
+        r"promoter and promoter group",
+        r"public shareholder",
+    ],
+    "Borrowing_Profile": [
+        r"credit rating assignment",
+        r"credit rating reaffirmation",
+        r"care ratings",
+        r"rating action",
+        r"stable outlook",
+    ],
+    "Annual_Report": [
+        r"annual report",
+        r"integrated report",
+        r"board'?s report",
+        r"management discussion",
+        r"statutory reports",
+    ],
+    "Portfolio_Performance": [
+        r"unaudited financial results",
+        r"outcome of the board meeting",
+        r"statement of profit and loss",
+        r"gross npa",
+        r"capital adequacy",
+    ],
 }
 
 
@@ -174,6 +280,95 @@ def _heuristic_classify(
     return ClassificationResult(category=category, confidence=confidence, reasoning=reasoning)
 
 
+def _normalize_category(value: object) -> str | None:
+    if not isinstance(value, str):
+        return None
+    normalized = value.strip()
+    if normalized in ALLOWED_CATEGORIES:
+        return normalized
+    lowered = normalized.lower().replace("_", " ").replace("-", " ")
+    lowered = re.sub(r"\s+", " ", lowered).strip()
+    return CATEGORY_ALIASES.get(lowered)
+
+
+def _normalize_confidence(value: object) -> float | None:
+    if isinstance(value, (int, float)):
+        confidence = float(value)
+        return confidence / 100.0 if confidence > 1.0 else confidence
+    if not isinstance(value, str):
+        return None
+    normalized = value.strip().lower().replace("%", "")
+    normalized = normalized.replace("very high", "very_high").replace("very low", "very_low")
+    if normalized in CONFIDENCE_ALIASES:
+        return CONFIDENCE_ALIASES[normalized]
+    try:
+        confidence = float(normalized)
+    except ValueError:
+        return None
+    return confidence / 100.0 if confidence > 1.0 else confidence
+
+
+def _strong_signal_classify(text: str, filename: str | None = None) -> ClassificationResult | None:
+    lowered = _normalize_text_for_patterns(text).lower()
+    filename_lowered = Path(filename).name.lower() if filename else ""
+
+    if "shareholding" in filename_lowered and "pattern" in filename_lowered:
+        return ClassificationResult(
+            category="Shareholding_Pattern",
+            confidence=0.98,
+            reasoning="Filename explicitly identifies a shareholding pattern filing.",
+        )
+    if "annual" in filename_lowered and "report" in filename_lowered:
+        return ClassificationResult(
+            category="Annual_Report",
+            confidence=0.98,
+            reasoning="Filename explicitly identifies an annual report.",
+        )
+    if "credit" in filename_lowered and "rating" in filename_lowered:
+        return ClassificationResult(
+            category="Borrowing_Profile",
+            confidence=0.97,
+            reasoning="Filename explicitly identifies a credit rating document.",
+        )
+    if "liquidity" in filename_lowered or "coverage_ratio" in filename_lowered or re.search(r"\blcr\b", filename_lowered):
+        return ClassificationResult(
+            category="ALM",
+            confidence=0.97,
+            reasoning="Filename explicitly identifies an LCR or liquidity disclosure.",
+        )
+    if "financial_result" in filename_lowered or "financial result" in filename_lowered:
+        return ClassificationResult(
+            category="Portfolio_Performance",
+            confidence=0.96,
+            reasoning="Filename explicitly identifies a quarterly financial results document.",
+        )
+
+    for category, patterns in STRONG_SIGNAL_PATTERNS.items():
+        matches = sum(len(re.findall(pattern, lowered)) for pattern in patterns)
+        if matches >= 2:
+            return ClassificationResult(
+                category=category,
+                confidence=0.94,
+                reasoning=f"Strong document-specific text signals matched {category}.",
+            )
+    return None
+
+
+def _normalize_llm_payload(payload: object) -> ClassificationResult | None:
+    if not isinstance(payload, dict):
+        return None
+    category = _normalize_category(payload.get("category"))
+    confidence = _normalize_confidence(payload.get("confidence"))
+    if not category or confidence is None:
+        return None
+    reasoning = payload.get("reasoning")
+    return ClassificationResult(
+        category=category,
+        confidence=max(0.0, min(0.99, confidence)),
+        reasoning=reasoning if isinstance(reasoning, str) and reasoning.strip() else "LLM classification",
+    )
+
+
 async def classify_document(
     first_pages_markdown: str,
     *,
@@ -181,43 +376,52 @@ async def classify_document(
     page_signal_counts: dict[str, int] | None = None,
 ) -> ClassificationResult:
     settings = get_settings()
-    if settings.classification_require_llm and not has_text_llm():
-        raise RuntimeError(
-            "Document classification requires Gemini. Set GEMINI_API_KEY."
-        )
-    if not has_text_llm():
-        return _heuristic_classify(
-            first_pages_markdown,
-            filename=filename,
-            page_signal_counts=page_signal_counts,
-        )
+    strong_signal = _strong_signal_classify(first_pages_markdown, filename=filename)
+    if strong_signal is not None:
+        return strong_signal
 
-    payload = generate_json(
-        (
-            "Classify this Indian financial document into exactly one of: "
-            "ALM, Shareholding_Pattern, Borrowing_Profile, Annual_Report, "
-            "Portfolio_Performance. Use the filename and page signals when relevant. "
-            "Return JSON with keys category, confidence, reasoning.\n\n"
-            f"Filename: {filename or 'unknown'}\n"
-            f"Page signals: {json.dumps(page_signal_counts or {}, ensure_ascii=True)}\n\n"
-            f"{first_pages_markdown[:4000]}"
-        ),
-        model=settings.gemini_text_model,
+    heuristic = _heuristic_classify(
+        first_pages_markdown,
+        filename=filename,
+        page_signal_counts=page_signal_counts,
     )
+    if heuristic.confidence >= 0.92:
+        return heuristic
+    if not has_text_llm():
+        return heuristic
+
     try:
-        return ClassificationResult(
-            category=payload["category"],
-            confidence=float(payload["confidence"]),
-            reasoning=payload.get("reasoning", "LLM classification"),
+        payload = generate_json(
+            (
+                "Classify this Indian corporate credit document into exactly one of: "
+                "ALM, Shareholding_Pattern, Borrowing_Profile, Annual_Report, "
+                "Portfolio_Performance.\n\n"
+                "Definitions:\n"
+                "- ALM: liquidity coverage ratio, HQLA, net cash outflows, ALM or liquidity disclosures.\n"
+                "- Shareholding_Pattern: regulation 31 shareholding tables, promoter/public holdings.\n"
+                "- Borrowing_Profile: credit rating letters, sanction letters, lender facilities, debt borrowing details.\n"
+                "- Annual_Report: annual or integrated reports with board's report, management discussion, financial statements.\n"
+                "- Portfolio_Performance: quarterly financial results, board meeting outcomes, portfolio cuts, GNPA/NNPA/PAR/AUM performance.\n\n"
+                "Rules:\n"
+                "- Quarterly financial results or board meeting outcome documents must be Portfolio_Performance even if Regulation 52 debt disclosures appear.\n"
+                "- Credit rating assignment or reaffirmation letters must be Borrowing_Profile.\n"
+                "- Shareholding filings under Regulation 31 must be Shareholding_Pattern.\n"
+                "- LCR or liquidity disclosure documents must be ALM.\n"
+                "- Annual or integrated reports must be Annual_Report.\n\n"
+                "Return strict JSON only with keys category, confidence, reasoning. "
+                "confidence must be a numeric value between 0 and 1.\n\n"
+                f"Filename: {filename or 'unknown'}\n"
+                f"Page signals: {json.dumps(page_signal_counts or {}, ensure_ascii=True)}\n"
+                f"Heuristic hint: {heuristic.category} ({heuristic.confidence:.2f})\n\n"
+                f"{first_pages_markdown[:4000]}"
+            ),
+            model=settings.gemini_text_model,
         )
     except Exception:
-        if settings.classification_require_llm:
-            raise RuntimeError("LLM classification failed and heuristic fallback is disabled.")
-        return _heuristic_classify(
-            first_pages_markdown,
-            filename=filename,
-            page_signal_counts=page_signal_counts,
-        )
+        return heuristic
+
+    normalized = _normalize_llm_payload(payload)
+    return normalized or heuristic
 
 
 def detect_compound_document(full_markdown: str) -> list[dict]:

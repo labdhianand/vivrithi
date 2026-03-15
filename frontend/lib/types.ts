@@ -39,6 +39,8 @@ export interface DocumentRecord {
   user_category?: string | null;
   classification_status: string;
   processing_status: string;
+  current_stage: string;
+  progress_percent: number;
   total_pages?: number | null;
   raw_markdown?: string | null;
   created_at: string;
@@ -117,6 +119,11 @@ export interface ResearchItem {
   relevance_score?: string | null;
   affected_c?: string | null;
   impact_description?: string | null;
+  entity_scope?: string | null;
+  entity_match_score?: string | null;
+  verification_status?: string | null;
+  matched_terms?: string | null;
+  match_explanation?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -133,6 +140,14 @@ export interface AnalystNote {
   updated_at: string;
 }
 
+export interface AnalystNoteInterpretation {
+  affected_c: string;
+  sentiment: string;
+  risk_adjustment: number;
+  rationale: string;
+  signals: string[];
+}
+
 export interface EvidenceRef {
   kind: "extraction" | "research" | "analyst_note" | string;
   label?: string | null;
@@ -147,6 +162,8 @@ export interface EvidenceRef {
   url?: string | null;
   source_name?: string | null;
   content?: string | null;
+  verification_status?: string | null;
+  entity_scope?: string | null;
 }
 
 export interface CFactor {
@@ -187,6 +204,7 @@ export interface Recommendation {
   conditions_precedent: string[];
   conditions_subsequent: string[];
   monitoring_covenants: string[];
+  improvement_scenarios: { title: string; detail: string; priority: string }[];
 }
 
 export interface SWOTItem {
@@ -215,6 +233,61 @@ export interface CrossCheck {
   note?: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface AnalysisSummary {
+  case_id: string;
+  missing_required_fields: Array<{
+    document_category: string;
+    field_key: string;
+    field_label: string;
+    document_id?: string | null;
+    document_name?: string | null;
+  }>;
+  contradictions: Array<{
+    id: string;
+    check_name: string;
+    status: string;
+    doc_a?: string | null;
+    doc_b?: string | null;
+    note?: string | null;
+    value_a?: string | null;
+    value_b?: string | null;
+  }>;
+  research_digest: {
+    counts_by_status: Record<string, number>;
+    counts_by_scope: Record<string, number>;
+    verified_borrower_items: Array<{
+      id: string;
+      category: string;
+      title?: string | null;
+      severity?: string | null;
+      verification_status?: string | null;
+      entity_scope?: string | null;
+      match_explanation?: string | null;
+      matched_terms?: string | null;
+      source_url?: string | null;
+    }>;
+    contextual_items: Array<{
+      id: string;
+      category: string;
+      title?: string | null;
+      severity?: string | null;
+      verification_status?: string | null;
+      entity_scope?: string | null;
+      match_explanation?: string | null;
+      matched_terms?: string | null;
+      source_url?: string | null;
+    }>;
+  };
+  note_impacts: Array<{
+    id: string;
+    note_type?: string | null;
+    affected_c?: string | null;
+    sentiment?: string | null;
+    risk_adjustment?: number | null;
+    content: string;
+  }>;
 }
 
 export interface ReportRecord {

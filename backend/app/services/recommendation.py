@@ -25,13 +25,29 @@ def _factor_refs(score_obj, limit: int = 2) -> list[dict]:
     return refs[:limit]
 
 
+def _research_attr(item: ResearchItem, name: str, default=None):
+    return getattr(item, name, default)
+
+
 def check_hard_stops(research: list[ResearchItem], cross_checks: list[dict]) -> list[str]:
     reasons = []
-    if any(item.category == "legal" and item.severity in {"high", "critical"} for item in research):
+    if any(
+        item.category == "legal"
+        and item.severity in {"high", "critical"}
+        and _research_attr(item, "verification_status") in {"verified", "probable"}
+        and _research_attr(item, "entity_scope") in {"borrower", "promoter"}
+        for item in research
+    ):
         reasons.append("High severity legal findings present.")
     if any(check["status"] == "mismatch" and check["check_name"] == "Rating Presence" for check in cross_checks):
         reasons.append("Current rating not clearly evidenced.")
-    if any(item.category == "legal" and "willful defaulter" in (item.title or "").lower() for item in research):
+    if any(
+        item.category == "legal"
+        and _research_attr(item, "verification_status") in {"verified", "probable"}
+        and _research_attr(item, "entity_scope") in {"borrower", "promoter"}
+        and "willful defaulter" in f"{item.title or ''} {item.summary or ''}".lower()
+        for item in research
+    ):
         reasons.append("Willful defaulter flag detected in RBI/regulatory search.")
     if any(
         check["status"] == "mismatch" and check["check_name"] == "Non-Core Income Concentration"
@@ -64,6 +80,99 @@ def calculate_risk_premium(risk_grade: str) -> Decimal:
         "D": Decimal("9.00"),
     }
     return mapping.get(risk_grade, Decimal("3.00"))
+
+
+def build_improvement_scenarios(
+    five_cs: dict,
+    cross_checks: list[dict],
+    hard_stops: list[str],
+) -> list[dict]:
+    scenarios: list[dict] = []
+    seen_titles: set[str] = set()
+
+    def _add(title: str, detail: str, priority: str = "medium") -> None:
+        if title in seen_titles:
+            return
+        seen_titles.add(title)
+        scenarios.append({"title": title, "detail": detail, "priority": priority})
+
+    if hard_stops:
+        if any("legal" in reason.lower() or "defaulter" in reason.lower() for reason in hard_stops):
+            _add(
+                "Resolve verified legal findings",
+                "Provide court-status updates, closure documents, or management clarification for the verified legal issues before reconsideration.",
+                "high",
+            )
+        if any("rating" in reason.lower() for reason in hard_stops):
+            _add(
+                "Evidence the current rating position",
+                "Upload the latest sanction letter, borrowing statement, or rating rationale to confirm the current external credit view.",
+                "high",
+            )
+        if any("circular trading" in reason.lower() or "non-core income" in reason.lower() for reason in hard_stops):
+            _add(
+                "Substantiate revenue quality",
+                "Provide GST and bank-statement reconciliations to rule out circular trading or inflated non-core income.",
+                "high",
+            )
+
+    mismatch_names = {item["check_name"] for item in cross_checks if item.get("status") == "mismatch"}
+    if "GST-Revenue Reasonableness" in mismatch_names:
+        _add(
+            "Reconcile GST with reported revenue",
+            "Submit a borrower-level reconciliation between GST filings, audited revenue, and banking flows.",
+        )
+    if "Net Worth Consistency" in mismatch_names or "Debt-Equity Ratio Consistency" in mismatch_names:
+        _add(
+            "Tighten capital evidence",
+            "Provide the latest audited net worth, leverage schedule, and any recent capital infusion support.",
+        )
+    if "LCR Consistency" in mismatch_names or "CRAR Consistency" in mismatch_names:
+        _add(
+            "Refresh liquidity and capital pack",
+            "Upload the latest ALM disclosure and regulatory capital pack to resolve liquidity or capital discrepancies.",
+        )
+
+    score_thresholds = {
+        "character": (
+            60,
+            "Strengthen governance comfort",
+            "Add verified promoter background, legal clarifications, and board or governance support to improve Character.",
+        ),
+        "capacity": (
+            60,
+            "Improve operating visibility",
+            "Provide fresher financial performance, utilization commentary, or cash-flow proof-points to strengthen Capacity.",
+        ),
+        "capital": (
+            60,
+            "Improve balance-sheet strength",
+            "Demonstrate stronger net worth, lower leverage, or committed capital support to improve Capital.",
+        ),
+        "collateral": (
+            55,
+            "Enhance collateral package",
+            "Provide clearer security cover, collateral valuation, or structural protections to strengthen Collateral.",
+        ),
+        "conditions": (
+            55,
+            "Mitigate sector and regulatory risk",
+            "Provide evidence of regulatory compliance, funding resilience, and sector-specific mitigants to improve Conditions.",
+        ),
+    }
+    for key, (threshold, title, detail) in score_thresholds.items():
+        factor = five_cs[key]
+        if factor.score < threshold:
+            _add(title, detail, "medium")
+
+    if not scenarios:
+        _add(
+            "Maintain performance and disclosure discipline",
+            "Keep quarterly disclosures, lender updates, and covenant reporting current to preserve the present credit view.",
+            "low",
+        )
+
+    return scenarios[:5]
 
 
 def generate_recommendation(
@@ -109,6 +218,7 @@ def generate_recommendation(
     hard_stops = check_hard_stops(research, cross_checks)
     if hard_stops:
         decision = "reject"
+    improvement_scenarios = build_improvement_scenarios(five_cs, cross_checks, hard_stops)
 
     # Use ML grade if available, else Five Cs grade
     effective_grade = ml_grade or five_cs["risk_grade"]
@@ -218,6 +328,7 @@ def generate_recommendation(
         "conditions_precedent": conditions_precedent,
         "conditions_subsequent": conditions_subsequent,
         "monitoring_covenants": monitoring,
+        "improvement_scenarios": improvement_scenarios,
     }
 
     # Attach ML metadata
@@ -229,6 +340,7 @@ def generate_recommendation(
             "ml_decision": ml_decision,
             "model_confidence": ml_prediction.get("model_confidence"),
             "feature_impacts": feature_impacts[:8],
+            "model_metadata": ml_prediction.get("model_metadata"),
         }
 
     return result

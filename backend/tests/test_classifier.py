@@ -43,3 +43,40 @@ def test_classify_sample_documents_from_corpus() -> None:
         markdown = _first_pages_markdown(pdf_path)
         result = asyncio.run(classify_document(markdown, filename=pdf_path.name))
         assert result.category == expected, f"{pdf_path.name}: {result}"
+
+
+def test_classify_document_falls_back_when_llm_confidence_is_invalid(monkeypatch) -> None:
+    async def _run() -> None:
+        monkeypatch.setattr("backend.app.services.classifier.has_text_llm", lambda: True)
+        monkeypatch.setattr(
+            "backend.app.services.classifier.generate_json",
+            lambda *args, **kwargs: {
+                "category": "Portfolio_Performance",
+                "confidence": "moderate",
+                "reasoning": "bad confidence shape",
+            },
+        )
+        result = await classify_document(
+            "Shareholding Pattern\nRegulation 31\nPromoter and promoter group",
+            filename="Shareholding_Pattern_Q3_FY26.pdf",
+        )
+        assert result.category == "Shareholding_Pattern"
+
+    asyncio.run(_run())
+
+
+def test_classify_document_falls_back_when_llm_raises(monkeypatch) -> None:
+    async def _run() -> None:
+        monkeypatch.setattr("backend.app.services.classifier.has_text_llm", lambda: True)
+
+        def _raise(*args, **kwargs):
+            raise RuntimeError("quota exceeded")
+
+        monkeypatch.setattr("backend.app.services.classifier.generate_json", _raise)
+        result = await classify_document(
+            "Unaudited Financial Results\nOutcome of the Board Meeting\nGross NPA",
+            filename="Financial_Result_Q3_FY26.pdf",
+        )
+        assert result.category == "Portfolio_Performance"
+
+    asyncio.run(_run())

@@ -30,6 +30,11 @@ class Extraction(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     extraction_method: Mapped[str | None] = mapped_column(String(64))
     user_verified: Mapped[bool] = mapped_column(Boolean, default=False)
     user_edited_value: Mapped[str | None] = mapped_column(Text)
+    correction_type: Mapped[str | None] = mapped_column(String(64))
+    sheet_name: Mapped[str | None] = mapped_column(String(255))
+    row_label: Mapped[str | None] = mapped_column(Text)
+    column_header: Mapped[str | None] = mapped_column(Text)
+    cell_reference: Mapped[str | None] = mapped_column(String(32))
 
     document = relationship("Document", back_populates="extractions")
     page = relationship("Page")

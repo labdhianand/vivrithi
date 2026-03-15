@@ -1,5 +1,7 @@
 import type {
   AnalystNote,
+  AnalystNoteInterpretation,
+  AnalysisSummary,
   CaseRecord,
   CrossCheck,
   DocumentRecord,
@@ -88,6 +90,16 @@ export async function approveClassification(documentId: string, category: string
   });
 }
 
+export async function rejectClassification(documentId: string) {
+  return request<DocumentRecord>(`/api/documents/${documentId}/classify`, {
+    method: "PATCH",
+    body: JSON.stringify({
+      user_category: "",
+      classification_status: "rejected",
+    }),
+  });
+}
+
 export async function processDocument(documentId: string) {
   return request<{ document: DocumentRecord; message: string }>(`/api/documents/${documentId}/process`, {
     method: "POST",
@@ -164,6 +176,13 @@ export async function createNote(caseId: string, payload: Partial<AnalystNote>) 
   });
 }
 
+export async function interpretNote(caseId: string, payload: { note_type?: string | null; content: string }) {
+  return request<AnalystNoteInterpretation>(`/api/cases/${caseId}/notes/interpret`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
 export async function listNotes(caseId: string) {
   return request<AnalystNote[]>(`/api/cases/${caseId}/notes`);
 }
@@ -190,6 +209,10 @@ export async function getRecommendation(caseId: string) {
 
 export async function getSwot(caseId: string) {
   return request<SWOT>(`/api/cases/${caseId}/swot`);
+}
+
+export async function getAnalysisSummary(caseId: string) {
+  return request<AnalysisSummary>(`/api/cases/${caseId}/analysis-summary`);
 }
 
 export async function generateReport(caseId: string) {

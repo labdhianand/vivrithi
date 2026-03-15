@@ -1,76 +1,276 @@
 import type { ReportRecord } from "@/lib/types";
 import { EvidencePills } from "@/components/evidence/evidence-pills";
 
+type MarkdownBlock = {
+  kind: "heading" | "subheading" | "bullet" | "paragraph";
+  text: string;
+};
+
+function cleanLine(text: string) {
+  return text.replace(/\s+/g, " ").trim();
+}
+
+function parseMarkdown(content: string): MarkdownBlock[] {
+  const blocks: MarkdownBlock[] = [];
+  const paragraphLines: string[] = [];
+
+  const flushParagraph = () => {
+    if (paragraphLines.length) {
+      blocks.push({ kind: "paragraph", text: cleanLine(paragraphLines.join(" ")) });
+      paragraphLines.length = 0;
+    }
+  };
+
+  for (const rawLine of content.split("\n")) {
+    const line = rawLine.trim();
+    if (!line) {
+      flushParagraph();
+      continue;
+    }
+    if (line.startsWith("#### ")) {
+      flushParagraph();
+      blocks.push({ kind: "subheading", text: line.slice(5).trim() });
+      continue;
+    }
+    if (/^#{1,3}\s+/.test(line)) {
+      flushParagraph();
+      blocks.push({ kind: "heading", text: line.replace(/^#{1,6}\s+/, "").trim() });
+      continue;
+    }
+    if (line.startsWith("- ")) {
+      flushParagraph();
+      blocks.push({ kind: "bullet", text: line.slice(2).trim() });
+      continue;
+    }
+    paragraphLines.push(line);
+  }
+
+  flushParagraph();
+  return blocks;
+}
+
+function prettifyId(value: string) {
+  return value
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (match) => match.toUpperCase());
+}
+
+function anchorForSection(sectionId: string, index: number) {
+  return `${sectionId || "section"}-${index + 1}`;
+}
+
+function firstSectionSnippet(report: ReportRecord) {
+  const first = report.sections?.[0]?.content_markdown || "";
+  const blocks = parseMarkdown(first);
+  return blocks.find((block) => block.kind === "paragraph" || block.kind === "bullet")?.text || "Generated credit memo draft ready for review and export.";
+}
+
+function splitLabelValue(text: string) {
+  const colonIndex = text.indexOf(":");
+  if (colonIndex === -1) {
+    return null;
+  }
+  const label = text.slice(0, colonIndex).trim();
+  const value = text.slice(colonIndex + 1).trim();
+  if (!label || !value) {
+    return null;
+  }
+  if (label.length > 34 || label.includes("]")) {
+    return null;
+  }
+  return { label, value };
+}
+
+function formatReportDate(value: string) {
+  return new Date(value).toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+}
+
 export function CamPreview({ report }: { report: ReportRecord }) {
   const sections = report.sections || [];
+  const summarySnippet = firstSectionSnippet(report);
 
   return (
-    <div className="space-y-1">
-      {/* Document wrapper with dark professional appearance */}
-      <div className="panel p-5">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent/15">
-            <svg className="h-4.5 w-4.5 text-accent-glow" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
-            </svg>
-          </div>
-          <div>
-            <h3 className="text-sm font-semibold text-slate-bright">Document Preview</h3>
-            <p className="text-[11px] text-slate-dim">
-              {sections.length} section{sections.length !== 1 ? "s" : ""}
-            </p>
+    <div className="grid gap-6 xl:grid-cols-[260px_minmax(0,1fr)]">
+      <aside className="space-y-4 xl:sticky xl:top-5 xl:self-start">
+        <div className="panel p-5">
+          <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-dim">Report Navigator</p>
+          <h3 className="mt-2 font-serif text-2xl text-slate-bright">Memo Draft</h3>
+          <p className="mt-2 text-sm leading-6 text-slate">
+            Review the section flow here, then download the fully formatted DOCX or PDF for submission.
+          </p>
+
+          <div className="mt-5 grid gap-3">
+            <div className="rounded-2xl border border-white/[0.06] bg-surface-200/50 p-3.5">
+              <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-slate-dim">Sections</p>
+              <p className="mt-2 text-2xl font-semibold text-gradient">{sections.length}</p>
+            </div>
+            <div className="rounded-2xl border border-white/[0.06] bg-surface-200/50 p-3.5">
+              <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-slate-dim">Generated</p>
+              <p className="mt-2 text-sm font-medium text-slate-bright">{formatReportDate(report.created_at)}</p>
+            </div>
           </div>
         </div>
 
-        {/* Sections */}
-        <div className="space-y-6">
-          {sections.map((section, i) => (
-            <div key={section.id}>
-              {/* Section divider (not on first) */}
-              {i > 0 && <div className="mb-6 h-px bg-white/[0.06]" />}
+        <div className="panel p-5">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-dim">Contents</p>
+              <p className="mt-1 text-sm text-slate">Jump directly into a CAM section.</p>
+            </div>
+            <div className="rounded-full border border-white/[0.08] bg-surface-200/60 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-dim">
+              {sections.length}
+            </div>
+          </div>
 
-              {/* Section header */}
-              <div className="mb-4 flex items-start gap-3">
-                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-surface-200 text-[10px] font-bold text-slate-dim">
-                  {String(i + 1).padStart(2, "0")}
+          <div className="mt-4 space-y-2">
+            {sections.map((section, index) => (
+              <a
+                key={section.id}
+                href={`#${anchorForSection(section.id, index)}`}
+                className="group flex items-start gap-3 rounded-xl border border-white/[0.05] bg-surface-200/30 px-3 py-2.5 transition-all duration-200 hover:border-accent/20 hover:bg-surface-200/70"
+              >
+                <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-surface-100 text-[10px] font-bold text-slate-dim group-hover:text-accent-glow">
+                  {String(index + 1).padStart(2, "0")}
                 </span>
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-dim">
-                    Section {section.id}
-                  </p>
-                  <h3 className="mt-1 text-lg font-semibold text-slate-bright">{section.title}</h3>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-slate-bright">{section.title}</p>
+                  <p className="mt-0.5 truncate text-[11px] text-slate-dim">{prettifyId(section.id)}</p>
                 </div>
-              </div>
+              </a>
+            ))}
+          </div>
+        </div>
+      </aside>
 
-              {/* Section content */}
-              <div className="ml-9 rounded-xl bg-surface-200/50 px-5 py-4">
-                <div className="whitespace-pre-wrap text-sm leading-7 text-slate">
-                  {section.content_markdown}
-                </div>
-                <EvidencePills refs={section.evidence_refs} caseId={report.case_id} />
-              </div>
+      <div className="panel overflow-hidden p-0">
+        <div className="border-b border-white/[0.06] bg-surface-100/80 px-5 py-4 sm:px-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-slate-dim">Report Preview</p>
+              <h3 className="mt-1 font-serif text-2xl text-slate-bright">Credit Appraisal Memo</h3>
             </div>
-          ))}
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded-full border border-white/[0.08] bg-surface-200/60 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-dim">
+                Memo-style preview
+              </span>
+              <span className="rounded-full border border-white/[0.08] bg-surface-200/60 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-dim">
+                {sections.length} sections
+              </span>
+            </div>
+          </div>
         </div>
 
-        {/* Footer */}
-        {sections.length > 0 && (
-          <>
-            <div className="mt-8 h-px bg-white/[0.06]" />
-            <div className="mt-4 flex items-center justify-between">
-              <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-dim">
-                Intelli-Credit CAM
+        <div className="bg-[radial-gradient(circle_at_top,_rgba(88,176,214,0.12),_transparent_35%),linear-gradient(180deg,_rgba(255,255,255,0.02),_rgba(255,255,255,0))] p-4 sm:p-6 lg:p-8">
+          <div className="mx-auto max-w-4xl rounded-[28px] border border-[#d6cdc0] bg-[#f6f1e8] text-[#1d2731] shadow-[0_24px_80px_rgba(0,0,0,0.28)]">
+            <div className="border-b border-[#d6cdc0] px-6 py-8 sm:px-10">
+              <p className="text-center text-[11px] font-semibold uppercase tracking-[0.35em] text-[#61717f]">
+                Intelli-Credit Copilot
               </p>
-              <p className="text-[10px] text-slate-dim">
-                Generated {new Date(report.created_at).toLocaleDateString("en-IN", {
-                  day: "numeric",
-                  month: "long",
-                  year: "numeric",
-                })}
-              </p>
+              <h2 className="mt-4 text-center font-serif text-4xl leading-tight text-[#213446] sm:text-[2.8rem]">
+                Credit Appraisal Memo
+              </h2>
+              <p className="mt-3 text-center text-base text-[#52606d]">{summarySnippet}</p>
+
+              <div className="mt-6 grid gap-3 md:grid-cols-3">
+                <div className="rounded-2xl border border-[#d6cdc0] bg-white/55 p-4">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#6c7883]">Prepared</p>
+                  <p className="mt-2 font-serif text-lg text-[#213446]">{formatReportDate(report.created_at)}</p>
+                </div>
+                <div className="rounded-2xl border border-[#d6cdc0] bg-white/55 p-4">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#6c7883]">Sections</p>
+                  <p className="mt-2 font-serif text-lg text-[#213446]">{sections.length}</p>
+                </div>
+                <div className="rounded-2xl border border-[#d6cdc0] bg-white/55 p-4">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#6c7883]">Format</p>
+                  <p className="mt-2 font-serif text-lg text-[#213446]">CAM Draft</p>
+                </div>
+              </div>
             </div>
-          </>
-        )}
+
+            <div className="px-6 py-6 sm:px-10 sm:py-8">
+              {sections.map((section, index) => (
+                <section
+                  key={section.id}
+                  id={anchorForSection(section.id, index)}
+                  className={`py-8 ${index > 0 ? "border-t border-[#d6cdc0]" : "pt-0"}`}
+                >
+                  <div className="flex flex-wrap items-start gap-4">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#cbbba4] bg-white/70 text-sm font-semibold text-[#213446]">
+                      {String(index + 1).padStart(2, "0")}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-[#73808c]">
+                        {prettifyId(section.id)}
+                      </p>
+                      <h3 className="mt-2 font-serif text-3xl leading-tight text-[#213446]">
+                        {section.title}
+                      </h3>
+                    </div>
+                  </div>
+
+                  <div className="mt-6 space-y-4">
+                    {parseMarkdown(section.content_markdown).map((block, blockIndex) => {
+                      if (block.kind === "heading") {
+                        return (
+                          <h4 key={blockIndex} className="font-serif text-2xl text-[#213446]">
+                            {block.text}
+                          </h4>
+                        );
+                      }
+
+                      if (block.kind === "subheading") {
+                        return (
+                          <h5 key={blockIndex} className="text-sm font-semibold uppercase tracking-[0.24em] text-[#61717f]">
+                            {block.text}
+                          </h5>
+                        );
+                      }
+
+                      if (block.kind === "bullet") {
+                        const pair = splitLabelValue(block.text);
+                        if (pair) {
+                          return (
+                            <div
+                              key={blockIndex}
+                              className="grid gap-2 rounded-2xl border border-[#ddd3c6] bg-white/55 px-4 py-3 md:grid-cols-[220px_minmax(0,1fr)]"
+                            >
+                              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#61717f]">
+                                {pair.label}
+                              </div>
+                              <div className="text-[15px] leading-7 text-[#1d2731]">{pair.value}</div>
+                            </div>
+                          );
+                        }
+
+                        return (
+                          <div key={blockIndex} className="flex gap-3 rounded-2xl border border-[#ddd3c6] bg-white/45 px-4 py-3">
+                            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#213446]" />
+                            <p className="text-[15px] leading-7 text-[#1d2731]">{block.text}</p>
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <p key={blockIndex} className="text-[15px] leading-8 text-[#24313c]">
+                          {block.text}
+                        </p>
+                      );
+                    })}
+                  </div>
+
+                  <div className="mt-5 rounded-2xl border border-[#ddd3c6] bg-white/45 px-4 py-3">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[#73808c]">Evidence Trail</p>
+                    <EvidencePills refs={section.evidence_refs} caseId={report.case_id} tone="light" />
+                  </div>
+                </section>
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

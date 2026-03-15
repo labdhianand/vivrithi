@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+import logging
 from collections import defaultdict
 from decimal import Decimal
 
 from ..models.document import Document
 from ..models.extraction import Extraction
+from ..models.research import ResearchItem
+from .llm_text import generate_json, has_text_llm
+
+logger = logging.getLogger(__name__)
 
 
 def _active_value(extraction: Extraction) -> str | None:
@@ -216,4 +221,119 @@ def cross_verify(case_id: str, documents: list[Document], extractions: list[Extr
                 }
             )
 
+    # 10. GST-Revenue Reasonableness Check (Indian regulatory context)
+    revenue_ext = _pick(extractions, "Annual_Report", "total_revenue_crore")
+    if not revenue_ext:
+        revenue_ext = _pick(extractions, "Portfolio_Performance", "total_revenue_operations")
+    gst_turnover = _pick(extractions, "GST_Returns", "turnover_reported")
+    if revenue_ext and _active_value(revenue_ext):
+        if gst_turnover and _active_numeric(gst_turnover) and _active_numeric(revenue_ext):
+            rev_val = _active_numeric(revenue_ext)
+            gst_val = _active_numeric(gst_turnover)
+            # Normalize if GST is in lakhs
+            if gst_val > rev_val * Decimal("50"):
+                gst_val = gst_val / Decimal("100")
+            diff = abs(rev_val - gst_val)
+            pct_diff = (diff / rev_val * 100) if rev_val else Decimal("0")
+            checks.append(
+                {
+                    "case_id": case_id,
+                    "check_name": "GST-Revenue Reasonableness",
+                    "doc_a": "Revenue Disclosure",
+                    "doc_b": "GST Returns",
+                    "value_a": _active_value(revenue_ext),
+                    "value_b": _active_value(gst_turnover),
+                    "discrepancy": pct_diff,
+                    "status": "match" if pct_diff < Decimal("10") else "mismatch",
+                    "note": f"GST turnover diverges by {pct_diff:.1f}% from reported revenue.",
+                }
+            )
+        else:
+            # Revenue exists but no GST data available — informational flag
+            checks.append(
+                {
+                    "case_id": case_id,
+                    "check_name": "GST-Revenue Reasonableness",
+                    "doc_a": "Revenue Disclosure",
+                    "doc_b": "GST Returns",
+                    "value_a": _active_value(revenue_ext),
+                    "value_b": "Not available",
+                    "discrepancy": Decimal("0"),
+                    "status": "match",
+                    "note": (
+                        "GST filing data not available for reconciliation. "
+                        "Recommend obtaining GSTR-2A/3B for revenue verification."
+                    ),
+                }
+            )
+
     return checks
+
+
+def llm_triangulate(
+    case_id: str,
+    extractions: list[Extraction],
+    research_items: list[ResearchItem],
+) -> list[dict]:
+    """Use LLM to find contradictions/corroborations between extracted data and research."""
+    if not has_text_llm() or not research_items:
+        return []
+
+    # Gather key extraction pairs
+    kv_pairs = []
+    for ext in extractions:
+        val = ext.user_edited_value or ext.value
+        if val and len(str(val)) >= 2:
+            kv_pairs.append(f"{ext.field_label or ext.schema_field_key}: {val}")
+    if not kv_pairs:
+        return []
+
+    # Gather top research summaries
+    research_summaries = []
+    for item in research_items[:5]:
+        title = item.title or ""
+        summary = item.summary or ""
+        source = getattr(item, "source_name", "") or ""
+        research_summaries.append(f"[{source}] {title}: {summary[:200]}")
+
+    prompt = f"""You are a credit analyst reviewing extracted financial data against secondary research findings.
+
+EXTRACTED DATA:
+{chr(10).join(kv_pairs[:30])}
+
+RESEARCH FINDINGS:
+{chr(10).join(research_summaries)}
+
+Identify up to 3 contradictions or corroborations between the extracted financial data and the research findings.
+Return a JSON array where each element has:
+- "check_name": short name for this check (e.g., "Rating vs Research Sentiment")
+- "status": "match" (corroboration) or "mismatch" (contradiction)
+- "note": one-sentence explanation
+- "source_a": which extracted field
+- "source_b": which research finding
+
+Return ONLY a JSON array, no markdown."""
+
+    try:
+        result = generate_json(prompt)
+        if not isinstance(result, list):
+            return []
+        checks = []
+        for item in result[:3]:
+            if not isinstance(item, dict):
+                continue
+            checks.append({
+                "case_id": case_id,
+                "check_name": f"LLM: {item.get('check_name', 'Triangulation')}",
+                "doc_a": str(item.get("source_a", "")),
+                "doc_b": str(item.get("source_b", "")),
+                "value_a": None,
+                "value_b": None,
+                "discrepancy": Decimal("0"),
+                "status": item.get("status", "match"),
+                "note": str(item.get("note", "")),
+            })
+        return checks
+    except Exception:
+        logger.warning("LLM triangulation failed", exc_info=True)
+        return []

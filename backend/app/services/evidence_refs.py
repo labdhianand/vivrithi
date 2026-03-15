@@ -19,16 +19,16 @@ def build_extraction_index(extractions: Iterable[Extraction]) -> dict[str, list[
 
 
 def extraction_ref(extraction: Extraction, *, label: str | None = None) -> EvidenceRef:
-    document = extraction.document
+    document = getattr(extraction, "document", None)
     return {
         "kind": "extraction",
-        "label": label or extraction.field_label or extraction.schema_field_key.replace("_", " "),
-        "document_id": extraction.document_id,
-        "document_name": document.original_filename if document else None,
-        "document_category": document.user_category if document else None,
-        "page_number": extraction.source_page_number,
-        "extraction_id": extraction.id,
-        "schema_field_key": extraction.schema_field_key,
+        "label": label or getattr(extraction, "field_label", None) or extraction.schema_field_key.replace("_", " "),
+        "document_id": getattr(extraction, "document_id", None),
+        "document_name": getattr(document, "original_filename", None) if document else None,
+        "document_category": getattr(document, "user_category", None) if document else None,
+        "page_number": getattr(extraction, "source_page_number", None),
+        "extraction_id": getattr(extraction, "id", None),
+        "schema_field_key": getattr(extraction, "schema_field_key", None),
     }
 
 
@@ -68,20 +68,22 @@ def refs_for_keys(
 def research_ref(item: ResearchItem, *, label: str | None = None) -> EvidenceRef:
     return {
         "kind": "research",
-        "label": label or item.title or item.source_name or "Research item",
-        "research_id": item.id,
-        "source_name": item.source_name,
-        "url": item.source_url,
-        "published_date": item.published_date.isoformat() if item.published_date else None,
-        "category": item.category,
+        "label": label or getattr(item, "title", None) or getattr(item, "source_name", None) or "Research item",
+        "research_id": getattr(item, "id", None),
+        "source_name": getattr(item, "source_name", None),
+        "url": getattr(item, "source_url", None),
+        "published_date": item.published_date.isoformat() if getattr(item, "published_date", None) else None,
+        "category": getattr(item, "category", None),
+        "verification_status": getattr(item, "verification_status", None),
+        "entity_scope": getattr(item, "entity_scope", None),
     }
 
 
 def note_ref(note: AnalystNote, *, label: str | None = None) -> EvidenceRef:
     return {
         "kind": "analyst_note",
-        "label": label or note.note_type or "Analyst note",
-        "note_id": note.id,
-        "affected_c": note.affected_c,
-        "content": note.content[:180],
+        "label": label or getattr(note, "note_type", None) or "Analyst note",
+        "note_id": getattr(note, "id", None),
+        "affected_c": getattr(note, "affected_c", None),
+        "content": getattr(note, "content", "")[:180],
     }

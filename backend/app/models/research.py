@@ -25,5 +25,10 @@ class ResearchItem(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     relevance_score: Mapped[Decimal | None] = mapped_column(Numeric(5, 4))
     affected_c: Mapped[str | None] = mapped_column(String(64))
     impact_description: Mapped[str | None] = mapped_column(Text)
+    entity_scope: Mapped[str | None] = mapped_column(String(32))
+    entity_match_score: Mapped[Decimal | None] = mapped_column(Numeric(5, 4))
+    verification_status: Mapped[str | None] = mapped_column(String(32))
+    matched_terms: Mapped[str | None] = mapped_column(Text)
+    match_explanation: Mapped[str | None] = mapped_column(Text)
 
     case = relationship("Case", back_populates="research_items")

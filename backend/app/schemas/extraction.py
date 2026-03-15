@@ -26,6 +26,11 @@ class ExtractionRead(BaseModel):
     extraction_method: str | None = None
     user_verified: bool = False
     user_edited_value: str | None = None
+    correction_type: str | None = None
+    sheet_name: str | None = None
+    row_label: str | None = None
+    column_header: str | None = None
+    cell_reference: str | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -34,4 +39,4 @@ class ExtractionUpdate(BaseModel):
     value: str | None = None
     user_edited_value: str | None = None
     user_verified: bool = True
-
+    correction_type: str | None = None

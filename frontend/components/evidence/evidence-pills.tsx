@@ -34,14 +34,21 @@ function hrefForRef(ref: EvidenceRef, caseId?: string) {
 export function EvidencePills({
   refs,
   caseId,
+  tone = "dark",
 }: {
   refs?: EvidenceRef[] | null;
   caseId?: string;
+  tone?: "dark" | "light";
 }) {
   const items = (refs || []).filter(Boolean);
   if (!items.length) {
     return null;
   }
+
+  const className =
+    tone === "light"
+      ? "inline-flex items-center rounded-full border border-[#d6cdc0] bg-white/70 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#5b6672] transition-colors hover:border-[#bcae99] hover:text-[#213446]"
+      : "inline-flex items-center rounded-full border border-white/[0.08] bg-surface-300/60 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-dim transition-colors hover:border-white/[0.14] hover:text-slate-bright";
 
   return (
     <div className="mt-2 flex flex-wrap gap-2">
@@ -49,8 +56,6 @@ export function EvidencePills({
         const href = hrefForRef(ref, caseId);
         const label = labelForRef(ref);
         const key = `${ref.kind}-${ref.extraction_id || ref.research_id || ref.note_id || index}`;
-        const className =
-          "inline-flex items-center rounded-full border border-white/[0.08] bg-surface-300/60 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-dim transition-colors hover:border-white/[0.14] hover:text-slate-bright";
 
         if (!href) {
           return (

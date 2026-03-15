@@ -18,16 +18,21 @@ function confidenceTone(score: number): "default" | "success" | "warn" | "danger
 export function ClassificationCard({
   document,
   onApprove,
+  onReject,
 }: {
   document: DocumentRecord;
   onApprove: (category: string) => Promise<void>;
+  onReject: () => Promise<void>;
 }) {
   const [category, setCategory] = useState(document.user_category || document.auto_category || "ALM");
   const [approving, setApproving] = useState(false);
+  const [rejecting, setRejecting] = useState(false);
   const confidence = document.auto_category_confidence ? Number(document.auto_category_confidence) : 0;
   const confidencePercent = Math.round(confidence * 100);
+  const progressPercent = Math.max(0, Math.min(100, document.progress_percent ?? 0));
   const readyForApproval = ["extracted", "completed"].includes(document.processing_status);
   const alreadyApproved = ["approved", "user_approved"].includes(document.classification_status);
+  const isRejected = document.classification_status === "rejected";
 
   return (
     <Card>
@@ -43,7 +48,7 @@ export function ClassificationCard({
 
           {/* Classification status row */}
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <Badge tone={alreadyApproved ? "success" : "neutral"}>
+            <Badge tone={alreadyApproved ? "success" : isRejected ? "danger" : "neutral"}>
               {document.classification_status}
             </Badge>
             <Badge
@@ -99,14 +104,32 @@ export function ClassificationCard({
         <div className="w-full shrink-0 space-y-4 md:w-[260px]">
           {!readyForApproval ? (
             <div className="rounded-xl border border-white/[0.06] bg-surface-200/60 p-4">
-              <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-dim">
-                Processing status
-              </p>
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-dim">
+                  Processing status
+                </p>
+                <Badge tone={document.processing_status === "failed" ? "danger" : "info"}>
+                  {progressPercent}%
+                </Badge>
+              </div>
               <p className="mt-2 text-sm text-slate-bright">
                 {document.processing_status === "failed"
                   ? "Processing failed. Re-upload or retry from the backend."
                   : "This document is still processing. Approval will appear automatically when extraction finishes."}
               </p>
+              <p className="mt-2 text-xs uppercase tracking-[0.2em] text-slate-dim">
+                {document.current_stage}
+              </p>
+              <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-surface">
+                <div
+                  className={`h-full rounded-full transition-all duration-700 ${
+                    document.processing_status === "failed"
+                      ? "bg-gradient-to-r from-rose to-rose-glow"
+                      : "bg-gradient-to-r from-accent to-accent-glow"
+                  }`}
+                  style={{ width: `${progressPercent}%` }}
+                />
+              </div>
             </div>
           ) : alreadyApproved ? (
             <div className="rounded-xl border border-emerald/20 bg-emerald/10 p-4">
@@ -115,6 +138,15 @@ export function ClassificationCard({
               </p>
               <p className="mt-2 text-sm font-medium text-emerald-glow">
                 {(document.user_category || document.auto_category || category).replace(/_/g, " ")}
+              </p>
+            </div>
+          ) : isRejected ? (
+            <div className="rounded-xl border border-rose/20 bg-rose/10 p-4">
+              <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-rose-glow/70">
+                Rejected
+              </p>
+              <p className="mt-2 text-sm text-rose-glow/80">
+                This document was rejected and will be excluded from analysis.
               </p>
             </div>
           ) : (
@@ -130,20 +162,37 @@ export function ClassificationCard({
                   </option>
                 ))}
               </Select>
-              <Button
-                className="w-full"
-                disabled={approving}
-                onClick={async () => {
-                  try {
-                    setApproving(true);
-                    await onApprove(category);
-                  } finally {
-                    setApproving(false);
-                  }
-                }}
-              >
-                {approving ? "Saving..." : "Approve category"}
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  className="flex-1"
+                  disabled={approving || rejecting}
+                  onClick={async () => {
+                    try {
+                      setApproving(true);
+                      await onApprove(category);
+                    } finally {
+                      setApproving(false);
+                    }
+                  }}
+                >
+                  {approving ? "Saving..." : "Approve"}
+                </Button>
+                <Button
+                  variant="danger"
+                  className="flex-1"
+                  disabled={approving || rejecting}
+                  onClick={async () => {
+                    try {
+                      setRejecting(true);
+                      await onReject();
+                    } finally {
+                      setRejecting(false);
+                    }
+                  }}
+                >
+                  {rejecting ? "Rejecting..." : "Reject"}
+                </Button>
+              </div>
             </>
           )}
         </div>

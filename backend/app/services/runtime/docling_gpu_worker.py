@@ -123,6 +123,7 @@ def _build_default_converter():
 def convert_document(args) -> dict:
     input_path = Path(args.input_path)
     suffix = input_path.suffix.lower()
+    is_tabular_source = suffix in {".csv", ".xls", ".xlsx"}
     started = time.perf_counter()
     if suffix == ".pdf":
         converter = _build_pdf_converter(args)
@@ -212,6 +213,7 @@ def convert_document(args) -> dict:
         table_payload = {
             "table_id": item.get("self_ref", f"table-{table_index}"),
             "page_number": page_number,
+            "sheet_name": f"Sheet {page_number}" if is_tabular_source else None,
             "bbox": bbox,
             "markdown": table_markdown,
             "row_count": len(rows),
@@ -250,6 +252,7 @@ def convert_document(args) -> dict:
         serialized_pages.append(
             {
                 "page_number": page_number,
+                "sheet_name": f"Sheet {page_number}" if is_tabular_source else None,
                 "width": page["width"],
                 "height": page["height"],
                 "has_tables": bool(page["tables"]),

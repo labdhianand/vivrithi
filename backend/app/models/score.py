@@ -35,6 +35,7 @@ class Score(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     conditions_precedent: Mapped[list[str] | None] = mapped_column(JSON)
     conditions_subsequent: Mapped[list[str] | None] = mapped_column(JSON)
     monitoring_covenants: Mapped[list[str] | None] = mapped_column(JSON)
+    improvement_scenarios: Mapped[list[dict] | None] = mapped_column(JSON)
     swot: Mapped[dict | None] = mapped_column(JSON)
 
     case = relationship("Case", back_populates="scores")

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import { interpretNote } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -9,7 +10,9 @@ import { Textarea } from "@/components/ui/textarea";
 
 export function AnalystNoteForm({
   onSubmit,
+  caseId,
 }: {
+  caseId: string;
   onSubmit: (payload: {
     note_type: string;
     affected_c: string;
@@ -24,6 +27,28 @@ export function AnalystNoteForm({
   const [riskAdjustment, setRiskAdjustment] = useState("0");
   const [content, setContent] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [suggesting, setSuggesting] = useState(false);
+  const [suggestion, setSuggestion] = useState<{
+    affected_c: string;
+    sentiment: string;
+    risk_adjustment: number;
+    rationale: string;
+    signals: string[];
+  } | null>(null);
+
+  const handleSuggest = async () => {
+    if (!content.trim()) return;
+    setSuggesting(true);
+    try {
+      const inferred = await interpretNote(caseId, { note_type: noteType, content });
+      setSuggestion(inferred);
+      setAffectedC(inferred.affected_c);
+      setSentiment(inferred.sentiment);
+      setRiskAdjustment(String(inferred.risk_adjustment));
+    } finally {
+      setSuggesting(false);
+    }
+  };
 
   const handleSubmit = async () => {
     if (!content.trim()) return;
@@ -38,6 +63,7 @@ export function AnalystNoteForm({
       });
       setContent("");
       setRiskAdjustment("0");
+      setSuggestion(null);
     } finally {
       setSubmitting(false);
     }
@@ -112,33 +138,79 @@ export function AnalystNoteForm({
         onChange={(event) => setContent(event.target.value)}
       />
 
+      {suggestion && (
+        <div className="rounded-xl border border-white/[0.08] bg-surface-200/60 p-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-dim">Suggested Mapping</span>
+            <span className="rounded-md bg-accent/15 px-2 py-1 text-[11px] text-accent-glow">{suggestion.affected_c}</span>
+            <span className="rounded-md bg-gold/15 px-2 py-1 text-[11px] text-gold-glow">{suggestion.sentiment}</span>
+            <span className="rounded-md bg-white/[0.06] px-2 py-1 text-[11px] text-slate">
+              {suggestion.risk_adjustment > 0 ? "+" : ""}
+              {suggestion.risk_adjustment}
+            </span>
+          </div>
+          <p className="mt-2 text-sm text-slate">{suggestion.rationale}</p>
+          {suggestion.signals.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {suggestion.signals.map((signal) => (
+                <span
+                  key={signal}
+                  className="rounded-md border border-white/[0.08] bg-surface-300/60 px-2 py-1 text-[11px] text-slate"
+                >
+                  {signal}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Submit row */}
       <div className="flex items-center justify-between">
         <p className="text-[11px] text-slate-dim">
           {content.length > 0 ? `${content.length} characters` : "Start typing your observation"}
         </p>
-        <Button
-          onClick={handleSubmit}
-          disabled={!content.trim() || submitting}
-          variant="gold"
-        >
-          {submitting ? (
-            <>
-              <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-              </svg>
-              Saving...
-            </>
-          ) : (
-            <>
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-              </svg>
-              Add Note
-            </>
-          )}
-        </Button>
+        <div className="flex items-center gap-3">
+          <Button
+            onClick={handleSuggest}
+            disabled={!content.trim() || suggesting}
+            variant="ghost"
+          >
+            {suggesting ? (
+              <>
+                <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                Interpreting...
+              </>
+            ) : (
+              "Auto-map note"
+            )}
+          </Button>
+          <Button
+            onClick={handleSubmit}
+            disabled={!content.trim() || submitting}
+            variant="gold"
+          >
+            {submitting ? (
+              <>
+                <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                Saving...
+              </>
+            ) : (
+              <>
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                </svg>
+                Add Note
+              </>
+            )}
+          </Button>
+        </div>
       </div>
     </div>
   );

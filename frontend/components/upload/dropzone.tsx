@@ -18,10 +18,17 @@ export function Dropzone({
     const name = file.name.toLowerCase();
     return (
       file.type === "application/pdf" ||
+      file.type === "image/png" ||
+      file.type === "image/jpeg" ||
+      file.type === "image/tiff" ||
       name.endsWith(".pdf") ||
       name.endsWith(".xlsx") ||
       name.endsWith(".xls") ||
-      name.endsWith(".csv")
+      name.endsWith(".csv") ||
+      name.endsWith(".png") ||
+      name.endsWith(".jpg") ||
+      name.endsWith(".jpeg") ||
+      name.endsWith(".tiff")
     );
   };
 
@@ -94,7 +101,7 @@ export function Dropzone({
             Upload ALM, shareholding pattern, borrowing profile, annual report, and portfolio/performance files. PDFs and spreadsheets are supported.
           </p>
           <p className="mt-1.5 text-[10px] font-bold uppercase tracking-[0.25em] text-slate-dim">
-            PDF, XLSX, XLS, CSV
+            PDF, XLSX, XLS, CSV, PNG, JPG, TIFF
           </p>
         </div>
         <Button variant="secondary" onClick={() => inputRef.current?.click()}>
@@ -105,7 +112,7 @@ export function Dropzone({
       <input
         ref={inputRef}
         type="file"
-        accept=".pdf,.xlsx,.xls,.csv,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv"
+        accept=".pdf,.xlsx,.xls,.csv,.png,.jpg,.jpeg,.tiff,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv,image/png,image/jpeg,image/tiff"
         multiple
         hidden
         onChange={(event) => {

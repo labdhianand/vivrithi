@@ -52,6 +52,30 @@ def _factor_refs(score_obj, limit: int = 3) -> list[dict]:
     return refs[:limit]
 
 
+def _verified_research(research: list[ResearchItem]) -> list[ResearchItem]:
+    return [
+        item
+        for item in research
+        if getattr(item, "verification_status", None) in {"verified", "probable", "contextual"}
+    ]
+
+
+def _borrower_research(research: list[ResearchItem]) -> list[ResearchItem]:
+    return [
+        item
+        for item in _verified_research(research)
+        if getattr(item, "entity_scope", None) in {"borrower", "promoter"}
+    ]
+
+
+def _contextual_research(research: list[ResearchItem]) -> list[ResearchItem]:
+    return [
+        item
+        for item in _verified_research(research)
+        if getattr(item, "entity_scope", None) in {"sector", "macro"}
+    ]
+
+
 def generate_cam_sections(
     case: Case,
     documents: list[Document],
@@ -64,12 +88,15 @@ def generate_cam_sections(
 ) -> list[dict]:
     extraction_map = _extraction_summary(extractions)
     extraction_index = build_extraction_index(extractions)
+    borrower_research = _borrower_research(research)
+    contextual_research = _contextual_research(research)
+    verified_research = _verified_research(research)
     docs_by_category = defaultdict(list)
     for document in documents:
         docs_by_category[document.user_category or document.auto_category or "Unclassified"].append(document.original_filename)
 
-    industry_refs = [research_ref(item) for item in research[:6]]
-    secondary_refs = [research_ref(item) for item in research[:10]]
+    industry_refs = [research_ref(item) for item in contextual_research[:6]]
+    secondary_refs = [research_ref(item) for item in verified_research[:10]]
     executive_refs = [
         *_factor_refs(five_cs["capital"], limit=2),
         *_factor_refs(five_cs["character"], limit=2),
@@ -110,7 +137,9 @@ def generate_cam_sections(
         {
             "id": "industry_analysis",
             "title": "Industry & Sector Analysis",
-            "content_markdown": "\n".join(f"- {item.title}: {item.summary}" for item in research[:6]) or "- Research pending",
+            "content_markdown": "\n".join(
+                f"- {item.title}: {item.summary}" for item in contextual_research[:6]
+            ) or "- Contextual sector and macro research pending.",
             "evidence_refs": industry_refs,
         }
     )
@@ -207,8 +236,19 @@ def generate_cam_sections(
             "id": "secondary_research",
             "title": "Secondary Research & External Intelligence",
             "content_markdown": "\n".join(
-                f"- [{item.category}] {item.title}: {item.impact_description}" for item in research[:10]
-            ),
+                [
+                    "#### Borrower / Promoter-specific findings",
+                    *[
+                        f"- [{item.category}] {item.title}: {item.impact_description}"
+                        for item in borrower_research[:5]
+                    ],
+                    "#### Sector / Macro context",
+                    *[
+                        f"- [{item.category}] {item.title}: {item.impact_description}"
+                        for item in contextual_research[:5]
+                    ],
+                ]
+            ) or "- No verified secondary research signals available.",
             "evidence_refs": secondary_refs,
         }
     )
@@ -267,7 +307,16 @@ def generate_cam_sections(
                 f"- Amount: {recommendation['recommended_amount_crore']}\n"
                 f"- Rate: {recommendation['recommended_rate_percent']}\n"
                 f"- Tenure: {recommendation['recommended_tenure_months']}\n"
-                f"- Reasoning: {recommendation['decision_reasoning']}"
+                f"- Reasoning: {recommendation['decision_reasoning']}\n"
+                + (
+                    "#### What Would Improve the Case\n"
+                    + "\n".join(
+                        f"- {item['title']}: {item['detail']}"
+                        for item in recommendation.get("improvement_scenarios", [])
+                    )
+                    if recommendation.get("improvement_scenarios")
+                    else ""
+                )
             ),
             "evidence_refs": executive_refs,
         }

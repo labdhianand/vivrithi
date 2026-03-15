@@ -21,6 +21,9 @@ class DocumentRead(BaseModel):
     user_category: str | None = None
     classification_status: str
     processing_status: str
+    failure_reason: str | None = None
+    current_stage: str
+    progress_percent: int
     total_pages: int | None = None
     raw_markdown: str | None = None
     created_at: datetime
@@ -54,4 +57,3 @@ class DocumentPageRead(BaseModel):
     parsing_duration_ms: int | None = None
     created_at: datetime
     updated_at: datetime
-

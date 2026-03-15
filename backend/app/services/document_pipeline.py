@@ -41,8 +41,33 @@ async def _reset_document_outputs(session: AsyncSession, document_id: str) -> No
     await session.commit()
 
 
+def _build_extraction_model(document: Document, page_model: Page | None, result) -> Extraction:
+    bbox = _normalize_bbox(result.bbox)
+    return Extraction(
+        document_id=document.id,
+        page_id=page_model.id if page_model else None,
+        schema_field_key=result.key,
+        field_label=result.label,
+        value=result.value,
+        value_type=result.value_type,
+        value_numeric=result.value_numeric,
+        source_page_number=result.page_number,
+        bbox_x1=bbox[0],
+        bbox_y1=bbox[1],
+        bbox_x2=bbox[2],
+        bbox_y2=bbox[3],
+        confidence=Decimal(str(round(result.confidence, 4))),
+        extraction_method=result.extraction_method,
+        sheet_name=getattr(result, "sheet_name", None),
+        row_label=getattr(result, "row_label", None),
+        column_header=getattr(result, "column_header", None),
+        cell_reference=getattr(result, "cell_reference", None),
+    )
+
+
 async def _process_document_legacy(session: AsyncSession, case: Case, document: Document) -> Document:
     document.processing_status = "triaging"
+    document.failure_reason = None
     await session.commit()
     pdf_path = storage.absolute_path(document.stored_path)
     triage_results = triage_document(pdf_path, case.id, document.id)
@@ -123,24 +148,7 @@ async def _process_document_legacy(session: AsyncSession, case: Case, document: 
     )
     for result in extraction_results:
         page_model = page_models_by_number.get(result.page_number or 0)
-        bbox = _normalize_bbox(result.bbox)
-        extraction = Extraction(
-            document_id=document.id,
-            page_id=page_model.id if page_model else None,
-            schema_field_key=result.key,
-            field_label=result.label,
-            value=result.value,
-            value_type=result.value_type,
-            value_numeric=result.value_numeric,
-            source_page_number=result.page_number,
-            bbox_x1=bbox[0],
-            bbox_y1=bbox[1],
-            bbox_x2=bbox[2],
-            bbox_y2=bbox[3],
-            confidence=Decimal(str(round(result.confidence, 4))),
-            extraction_method=result.extraction_method,
-        )
-        session.add(extraction)
+        session.add(_build_extraction_model(document, page_model, result))
 
     document.processing_status = "extracted"
     case.status = "extracted"
@@ -152,6 +160,7 @@ async def _process_document_legacy(session: AsyncSession, case: Case, document: 
 async def _process_document_fast(session: AsyncSession, case: Case, document: Document) -> Document:
     settings = get_settings()
     document.processing_status = "parsing"
+    document.failure_reason = None
     await session.commit()
     pdf_path = storage.absolute_path(document.stored_path)
     await _reset_document_outputs(session, document.id)
@@ -195,24 +204,7 @@ async def _process_document_fast(session: AsyncSession, case: Case, document: Do
 
     for extracted in result.extraction.extraction_results:
         page_model = page_models_by_number.get(extracted.page_number or 0)
-        bbox = _normalize_bbox(extracted.bbox)
-        extraction = Extraction(
-            document_id=document.id,
-            page_id=page_model.id if page_model else None,
-            schema_field_key=extracted.key,
-            field_label=extracted.label,
-            value=extracted.value,
-            value_type=extracted.value_type,
-            value_numeric=extracted.value_numeric,
-            source_page_number=extracted.page_number,
-            bbox_x1=bbox[0],
-            bbox_y1=bbox[1],
-            bbox_x2=bbox[2],
-            bbox_y2=bbox[3],
-            confidence=Decimal(str(round(extracted.confidence, 4))),
-            extraction_method=extracted.extraction_method,
-        )
-        session.add(extraction)
+        session.add(_build_extraction_model(document, page_model, extracted))
 
     document.processing_status = "extracted"
     case.status = "extracted"
@@ -223,6 +215,7 @@ async def _process_document_fast(session: AsyncSession, case: Case, document: Do
 
 async def _process_document_docling_remote(session: AsyncSession, case: Case, document: Document) -> Document:
     document.processing_status = "parsing"
+    document.failure_reason = None
     await session.commit()
     source_path = storage.absolute_path(document.stored_path)
     await _reset_document_outputs(session, document.id)
@@ -231,31 +224,17 @@ async def _process_document_docling_remote(session: AsyncSession, case: Case, do
     remote_result = await remote_backend.convert(source_path)
     parsed_pages = parsed_pages_from_remote_payload(remote_result.payload)
 
-    triage_by_page = {}
-    if source_path.suffix.lower() == ".pdf":
-        document.processing_status = "triaging"
-        await session.commit()
-        triage_by_page = {
-            item.page_number: item
-            for item in triage_document(source_path, case.id, document.id)
-        }
-        document.processing_status = "parsing"
-        await session.commit()
-
     page_models_by_number: dict[int, Page] = {}
     page_signal_counts: Counter[str] = Counter()
     page_duration_ms = int(
         round((remote_result.convert_seconds / max(len(parsed_pages), 1)) * 1000)
     )
+    document.total_pages = len(parsed_pages)
+    await session.commit()
     for parsed_page in parsed_pages:
-        triage = triage_by_page.get(parsed_page.page_number)
         has_tables = bool(parsed_page.tables)
-        is_scanned = triage.is_scanned if triage else False
-        content_type = (
-            triage.content_type
-            if triage
-            else classify_page_content(parsed_page.text, is_scanned, has_tables)
-        )
+        is_scanned = False
+        content_type = classify_page_content(parsed_page.text, is_scanned, has_tables)
         page_signal_counts[content_type] += 1
         page_model = Page(
             document_id=document.id,
@@ -266,7 +245,7 @@ async def _process_document_docling_remote(session: AsyncSession, case: Case, do
             parser_used="docling_gpu_remote",
             raw_text=parsed_page.text,
             raw_markdown=parsed_page.markdown,
-            page_image_path=triage.image_path if triage else None,
+            page_image_path=None,
             parsing_confidence=Decimal("0.9400"),
             parsing_duration_ms=page_duration_ms,
         )
@@ -274,9 +253,10 @@ async def _process_document_docling_remote(session: AsyncSession, case: Case, do
         await session.flush()
         page_models_by_number[parsed_page.page_number] = page_model
 
-    document.total_pages = len(parsed_pages)
     document.raw_markdown = remote_result.markdown or build_document_markdown(parsed_pages)
     first_pages_markdown = "\n\n".join(page.markdown for page in parsed_pages[:3])
+    document.processing_status = "classifying"
+    await session.commit()
     classification = await classify_document(
         first_pages_markdown or document.raw_markdown or "",
         filename=document.original_filename,
@@ -301,24 +281,91 @@ async def _process_document_docling_remote(session: AsyncSession, case: Case, do
     )
     for result in extraction_results:
         page_model = page_models_by_number.get(result.page_number or 0)
-        bbox = _normalize_bbox(result.bbox)
-        extraction = Extraction(
-            document_id=document.id,
-            page_id=page_model.id if page_model else None,
-            schema_field_key=result.key,
-            field_label=result.label,
-            value=result.value,
-            value_type=result.value_type,
-            value_numeric=result.value_numeric,
-            source_page_number=result.page_number,
-            bbox_x1=bbox[0],
-            bbox_y1=bbox[1],
-            bbox_x2=bbox[2],
-            bbox_y2=bbox[3],
-            confidence=Decimal(str(round(result.confidence, 4))),
-            extraction_method=result.extraction_method,
-        )
-        session.add(extraction)
+        session.add(_build_extraction_model(document, page_model, result))
+
+    document.processing_status = "extracted"
+    case.status = "extracted"
+    await session.commit()
+    await session.refresh(document)
+    return document
+
+
+IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".tiff"}
+
+
+async def _process_document_image(session: AsyncSession, case: Case, document: Document) -> Document:
+    """Process an uploaded image file through Gemini vision OCR, then classify and extract."""
+    document.processing_status = "parsing"
+    document.failure_reason = None
+    await session.commit()
+    source_path = storage.absolute_path(document.stored_path)
+    await _reset_document_outputs(session, document.id)
+
+    # Create a single Page record for the image
+    page_image_relative = document.stored_path  # The image itself is the page image
+    page_model = Page(
+        document_id=document.id,
+        page_number=1,
+        is_scanned=True,
+        has_tables=False,
+        content_type="scanned",
+        parser_used="gemini_vision",
+        raw_text="",
+        raw_markdown="",
+        page_image_path=page_image_relative,
+        parsing_confidence=Decimal("0.8000"),
+        parsing_duration_ms=0,
+    )
+    session.add(page_model)
+    await session.flush()
+
+    # Run Gemini vision OCR on the image
+    parsed = await parse_page_gemini_vision(
+        pdf_path=source_path,
+        page_num=0,
+        page_image_path=source_path,
+    )
+    page_model.raw_text = parsed.text
+    page_model.raw_markdown = parsed.markdown
+    page_model.parsing_confidence = Decimal(str(round(parsed.confidence, 4)))
+
+    document.total_pages = 1
+    document.raw_markdown = parsed.markdown
+
+    # Classify
+    document.processing_status = "classifying"
+    await session.commit()
+    classification = await classify_document(
+        parsed.markdown,
+        filename=document.original_filename,
+    )
+    document.auto_category = classification.category
+    document.auto_category_confidence = Decimal(str(round(classification.confidence, 4)))
+    if not document.user_category:
+        document.user_category = classification.category
+    if document.classification_status == "pending":
+        document.classification_status = "auto_classified"
+
+    # Extract
+    schema = await get_or_create_case_schema(session, case.id, document.user_category)
+    document.processing_status = "extracting"
+    await session.commit()
+
+    parsed_pages = [ParsedPage(
+        page_number=1,
+        text=parsed.text,
+        markdown=parsed.markdown,
+        parser_used="gemini_vision",
+        confidence=parsed.confidence,
+    )]
+    extraction_results = await extract_with_schema(
+        pdf_path=source_path,
+        document_markdown=document.raw_markdown,
+        schema={"category": schema.document_category, "fields": schema.fields},
+        pages=parsed_pages,
+    )
+    for result in extraction_results:
+        session.add(_build_extraction_model(document, page_model, result))
 
     document.processing_status = "extracted"
     case.status = "extracted"
@@ -333,6 +380,11 @@ async def process_document(
     document: Document,
     backend: str | None = None,
 ) -> Document:
+    # Check if this is an image file — route to image pipeline
+    suffix = Path(document.original_filename or "").suffix.lower()
+    if suffix in IMAGE_EXTENSIONS:
+        return await _process_document_image(session, case, document)
+
     selected_backend = (backend or get_settings().document_processing_backend).strip().lower()
     if selected_backend in {"legacy", "classic"}:
         return await _process_document_legacy(session, case, document)

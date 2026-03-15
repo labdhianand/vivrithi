@@ -169,6 +169,7 @@ def parsed_pages_from_remote_payload(payload: dict[str, Any]) -> list[ParsedPage
                 bbox=tuple(table.get("bbox") or [0.0, 0.0, 1.0, 1.0]),
                 rows=table.get("rows") or [],
                 markdown=table.get("markdown") or "",
+                sheet_name=table.get("sheet_name"),
             )
             for table in page.get("tables", [])
         ]

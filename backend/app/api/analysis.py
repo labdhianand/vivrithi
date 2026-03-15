@@ -7,9 +7,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..database import get_session
 from ..models.analyst_note import AnalystNote
 from ..models.case import Case, CrossVerification
+from ..models.document import Document
 from ..models.score import Score
-from ..schemas.analysis import CScoreRead, CrossCheckRead, FiveCsRead, RecommendationRead, SWOTRead
+from ..schemas.analysis import AnalysisSummaryRead, CScoreRead, CrossCheckRead, FiveCsRead, RecommendationRead, SWOTRead
 from ..services.analysis_pipeline import parse_reasoning_factors, run_case_analysis
+from ..services.analysis_summary import build_case_analysis_summary
+
+REQUIRED_CATEGORIES = {"ALM", "Shareholding_Pattern", "Borrowing_Profile", "Annual_Report", "Portfolio_Performance"}
 
 
 router = APIRouter()
@@ -42,6 +46,25 @@ async def analyze_case(case_id: str, session: AsyncSession = Depends(get_session
     case = await session.get(Case, case_id)
     if not case:
         raise HTTPException(status_code=404, detail="Case not found")
+
+    # Pack validation gate: check all 5 categories are covered by approved docs
+    docs_result = await session.execute(
+        select(Document).where(Document.case_id == case_id)
+    )
+    approved_docs = [
+        d for d in docs_result.scalars().all()
+        if d.classification_status in ("approved", "user_approved")
+    ]
+    covered = {d.user_category or d.auto_category for d in approved_docs} & REQUIRED_CATEGORIES
+    missing = REQUIRED_CATEGORIES - covered
+    if missing:
+        missing_labels = ", ".join(c.replace("_", " ") for c in sorted(missing))
+        raise HTTPException(
+            status_code=400,
+            detail=f"Document pack incomplete. Missing approved documents for: {missing_labels}. "
+                   f"All 5 document categories must be present before analysis.",
+        )
+
     notes_result = await session.execute(
         select(AnalystNote).where(AnalystNote.case_id == case_id).order_by(AnalystNote.created_at.desc())
     )
@@ -59,6 +82,7 @@ async def analyze_case(case_id: str, session: AsyncSession = Depends(get_session
         conditions_precedent=score.conditions_precedent or [],
         conditions_subsequent=score.conditions_subsequent or [],
         monitoring_covenants=score.monitoring_covenants or [],
+        improvement_scenarios=score.improvement_scenarios or [],
     )
 
 
@@ -98,6 +122,7 @@ async def get_recommendation(case_id: str, session: AsyncSession = Depends(get_s
         conditions_precedent=score.conditions_precedent or [],
         conditions_subsequent=score.conditions_subsequent or [],
         monitoring_covenants=score.monitoring_covenants or [],
+        improvement_scenarios=score.improvement_scenarios or [],
     )
 
 
@@ -109,3 +134,10 @@ async def get_swot(case_id: str, session: AsyncSession = Depends(get_session)) -
         raise HTTPException(status_code=404, detail="SWOT not found")
     return SWOTRead(**score.swot)
 
+
+@router.get("/cases/{case_id}/analysis-summary", response_model=AnalysisSummaryRead)
+async def get_analysis_summary(case_id: str, session: AsyncSession = Depends(get_session)) -> AnalysisSummaryRead:
+    case = await session.get(Case, case_id)
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found")
+    return AnalysisSummaryRead(**(await build_case_analysis_summary(session, case_id)))

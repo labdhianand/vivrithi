@@ -44,6 +44,10 @@ SUPPORTED_UPLOAD_EXTENSIONS = {
     ".xlsx",
     ".xls",
     ".csv",
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".tiff",
 }
 _case_processing_tasks: dict[str, asyncio.Task[None]] = {}
 
@@ -124,7 +128,10 @@ async def upload_documents(
         if suffix not in SUPPORTED_UPLOAD_EXTENSIONS:
             raise HTTPException(status_code=400, detail=f"Unsupported file type: {filename}")
         document_id = str(uuid.uuid4())
-        stored = await storage.save_upload(case_id, document_id, upload)
+        try:
+            stored = await storage.save_upload(case_id, document_id, upload)
+        except ValueError as exc:
+            raise HTTPException(status_code=413, detail=str(exc)) from exc
         document = Document(
             id=document_id,
             case_id=case_id,
@@ -154,8 +161,9 @@ async def _process_document_task(case_id: str, document_id: str, backend: str) -
             raise RuntimeError(f"Missing case/document for processing: {case_id}/{document_id}")
         try:
             await process_document(task_session, case, document, backend=backend)
-        except Exception:
+        except Exception as exc:
             document.processing_status = "failed"
+            document.failure_reason = str(exc)[:1000] or "Processing failed"
             await task_session.commit()
             raise
 
@@ -186,6 +194,10 @@ def _enqueue_case_processing(case_id: str, document_ids: list[str], backend: str
     task = asyncio.create_task(_run_case_processing(case_id, document_ids, backend))
     task.add_done_callback(_observe_background_task)
     _case_processing_tasks[case_id] = task
+
+
+def _case_processing_active(case_id: str) -> bool:
+    return case_id in _case_processing_tasks and not _case_processing_tasks[case_id].done()
 
 
 @router.get("/cases/{case_id}/documents", response_model=list[DocumentRead])
@@ -231,10 +243,42 @@ async def process_document_endpoint(
         raise HTTPException(status_code=404, detail="Document not found")
     case = await session.get(Case, document.case_id)
     try:
+        document.processing_status = "queued"
+        document.failure_reason = None
+        await session.commit()
         processed = await process_document(session, case, document, backend=_normalize_process_backend(backend))
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return DocumentProcessRead(document=processed, message="Document processed")
+
+
+@router.post("/documents/{doc_id}/retry", response_model=DocumentProcessRead)
+async def retry_document_processing(
+    doc_id: str,
+    backend: str | None = Query(default=None),
+    wait: bool = Query(default=False),
+    session: AsyncSession = Depends(get_session),
+) -> DocumentProcessRead:
+    document = await session.get(Document, doc_id)
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+    case = await session.get(Case, document.case_id)
+    selected_backend = _normalize_process_backend(backend)
+    document.processing_status = "queued"
+    document.failure_reason = None
+    await session.commit()
+    await session.refresh(document)
+    if wait:
+        try:
+            processed = await process_document(session, case, document, backend=selected_backend)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return DocumentProcessRead(document=processed, message="Document retried successfully")
+    if _case_processing_active(case.id):
+        raise HTTPException(status_code=409, detail="Case processing already in progress")
+    _enqueue_case_processing(case.id, [document.id], selected_backend)
+    await session.refresh(document)
+    return DocumentProcessRead(document=document, message="Document retry queued")
 
 
 @router.post("/cases/{case_id}/documents/process", response_model=list[DocumentRead])
@@ -265,12 +309,41 @@ async def process_case_documents(
         except Exception as exc:
             raise HTTPException(status_code=500, detail=f"Failed to process one or more documents: {exc}") from exc
     else:
-        if case_id not in _case_processing_tasks or _case_processing_tasks[case_id].done():
+        if not _case_processing_active(case_id):
             for item in documents:
                 if item.processing_status not in {"extracted", "completed"}:
                     item.processing_status = "queued"
+                    item.failure_reason = None
             await session.commit()
             _enqueue_case_processing(case_id, document_ids, selected_backend)
+    refreshed = await session.execute(
+        select(Document).where(Document.case_id == case_id).order_by(Document.created_at)
+    )
+    return list(refreshed.scalars().all())
+
+
+@router.post("/cases/{case_id}/documents/retry-failed", response_model=list[DocumentRead])
+async def retry_failed_case_documents(
+    case_id: str,
+    backend: str | None = Query(default=None),
+    session: AsyncSession = Depends(get_session),
+) -> list[Document]:
+    case = await session.get(Case, case_id)
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found")
+    if _case_processing_active(case_id):
+        raise HTTPException(status_code=409, detail="Case processing already in progress")
+    result = await session.execute(
+        select(Document).where(Document.case_id == case_id).order_by(Document.created_at)
+    )
+    documents = [item for item in result.scalars().all() if item.processing_status == "failed"]
+    if not documents:
+        return []
+    for item in documents:
+        item.processing_status = "queued"
+        item.failure_reason = None
+    await session.commit()
+    _enqueue_case_processing(case_id, [item.id for item in documents], _normalize_process_backend(backend))
     refreshed = await session.execute(
         select(Document).where(Document.case_id == case_id).order_by(Document.created_at)
     )

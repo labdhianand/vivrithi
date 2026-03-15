@@ -41,6 +41,18 @@ def _summary(name: str, score: int, factors: list[dict]) -> str:
     return f"{name} scored {score}/100 driven by {head}."
 
 
+def _research_attr(item: ResearchItem, name: str, default=None):
+    return getattr(item, name, default)
+
+
+def _research_scope(item: ResearchItem) -> str:
+    return str(_research_attr(item, "entity_scope", "") or "")
+
+
+def _research_status(item: ResearchItem) -> str:
+    return str(_research_attr(item, "verification_status", "") or "")
+
+
 def score_character(
     values: dict,
     extraction_index: dict[str, list[Extraction]],
@@ -106,7 +118,38 @@ def score_character(
             }
         )
 
-    severe_news = [item for item in research if item.category in {"promoter", "legal"} and item.severity in {"high", "critical"}]
+    # GST/CIBIL compliance concerns from Indian regulatory research
+    gst_cibil_hits = [
+        item
+        for item in research
+        if _research_status(item) in {"verified", "probable"}
+        and _research_scope(item) in {"borrower", "promoter"}
+        and item.sentiment == "negative"
+        and any(
+            term in f"{item.title or ''} {item.summary or ''}".lower()
+            for term in ["gst", "gstr", "cibil", "wilful defaulter", "npa", "default", "tax evasion"]
+        )
+    ]
+    if gst_cibil_hits:
+        impact = -5 * min(len(gst_cibil_hits), 3)
+        score += impact
+        factors.append(
+            {
+                "signal": "GST/CIBIL Compliance Concerns",
+                "impact": impact,
+                "evidence": "; ".join(item.title or "" for item in gst_cibil_hits[:3]),
+                "evidence_refs": [research_ref(item) for item in gst_cibil_hits[:3]],
+            }
+        )
+
+    severe_news = [
+        item
+        for item in research
+        if item.category in {"promoter", "legal"}
+        and item.severity in {"high", "critical"}
+        and _research_status(item) in {"verified", "probable"}
+        and _research_scope(item) in {"borrower", "promoter"}
+    ]
     if severe_news:
         impact = -5 * len(severe_news)
         score += impact
@@ -355,18 +398,50 @@ def score_conditions(
                 ],
             }
         )
-    regulatory_hits = [item for item in research if item.category == "regulatory" and item.severity in {"high", "critical"}]
-    if regulatory_hits:
+    borrower_regulatory_hits = [
+        item
+        for item in research
+        if item.category == "regulatory"
+        and item.severity in {"high", "critical"}
+        and _research_status(item) in {"verified", "probable"}
+        and _research_scope(item) == "borrower"
+    ]
+    contextual_regulatory_hits = [
+        item
+        for item in research
+        if item.category == "regulatory"
+        and item.severity in {"medium", "high", "critical"}
+        and _research_status(item) in {"verified", "probable", "contextual"}
+        and _research_scope(item) in {"sector", "macro"}
+    ]
+    if borrower_regulatory_hits:
         score -= 10
         factors.append(
             {
-                "signal": "Adverse regulatory signal",
+                "signal": "Borrower-specific regulatory signal",
                 "impact": -10,
-                "evidence": "Recent regulatory developments flagged.",
-                "evidence_refs": [research_ref(item) for item in regulatory_hits[:3]],
+                "evidence": "Borrower-matched regulatory developments flagged.",
+                "evidence_refs": [research_ref(item) for item in borrower_regulatory_hits[:3]],
             }
         )
-    sector_hits = [item for item in research if item.category == "sector" and item.sentiment == "negative"]
+    elif contextual_regulatory_hits:
+        score -= 4
+        factors.append(
+            {
+                "signal": "Sector or macro regulatory headwind",
+                "impact": -4,
+                "evidence": "Contextual regulatory developments may tighten operating conditions.",
+                "evidence_refs": [research_ref(item) for item in contextual_regulatory_hits[:3]],
+            }
+        )
+    sector_hits = [
+        item
+        for item in research
+        if item.category == "sector"
+        and item.sentiment == "negative"
+        and _research_status(item) in {"verified", "probable", "contextual"}
+        and _research_scope(item) in {"sector", "macro", "borrower"}
+    ]
     if sector_hits:
         score -= 5
         factors.append(

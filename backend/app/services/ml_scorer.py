@@ -192,6 +192,50 @@ def get_model() -> GradientBoostingClassifier:
     return _cached_model
 
 
+def get_model_metadata() -> dict:
+    """Return model metadata for transparency: AUC, feature importances, and calibration disclaimer."""
+    model_path = _get_model_path()
+    auc = 0.0
+    if model_path.exists():
+        try:
+            bundle = joblib.load(model_path)
+            if isinstance(bundle, dict):
+                auc = bundle.get("auc", 0.0)
+        except Exception:
+            pass
+
+    model = get_model()
+    importances = model.feature_importances_
+    feature_ranking = sorted(
+        [(name, round(float(imp) * 100, 1)) for name, imp in zip(FEATURE_NAMES, importances)],
+        key=lambda x: x[1],
+        reverse=True,
+    )
+
+    return {
+        "model_type": "Gradient Boosting Classifier",
+        "n_estimators": 200,
+        "training_samples": 2000,
+        "training_auc": round(float(auc), 4),
+        "feature_count": len(FEATURE_NAMES),
+        "top_features": [
+            {"feature": name.replace("_", " ").title(), "importance": imp}
+            for name, imp in feature_ranking[:7]
+        ],
+        "calibration_disclaimer": (
+            "This model is trained on synthetic data representative of Indian corporate credit profiles. "
+            "In production, the model should be calibrated against actual default outcomes and validated "
+            "with real portfolio data. PD estimates should be used as directional inputs alongside "
+            "rule-based scoring, not as standalone decisions."
+        ),
+        "training_data_composition": {
+            "good_credits": "60%",
+            "stressed_credits": "25%",
+            "default_prone": "15%",
+        },
+    }
+
+
 def _parse_rating_notch(rating_str: str | None) -> float:
     if not rating_str:
         return 3.0  # default to BBB-ish

@@ -69,6 +69,7 @@ export default function NotesPage({ params }: { params: { caseId: string } }) {
       {/* Form */}
       <div className="animate-slide-up stagger-1">
         <AnalystNoteForm
+          caseId={params.caseId}
           onSubmit={async (payload) => {
             await createNote(params.caseId, payload);
             await refresh();

@@ -3,14 +3,15 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
-import { listExtractions, listPages, rerunExtraction, updateExtraction } from "@/lib/api";
-import type { ExtractionRecord, PageRecord } from "@/lib/types";
+import { getDocument, listExtractions, listPages, rerunExtraction, updateExtraction } from "@/lib/api";
+import type { DocumentRecord, ExtractionRecord, PageRecord } from "@/lib/types";
 import { ExtractedDataTable } from "@/components/extraction/extracted-data-table";
 import { PdfViewer } from "@/components/extraction/pdf-viewer";
 import { Button } from "@/components/ui/button";
 
 export default function DocumentExtractionPage({ params }: { params: { caseId: string; docId: string } }) {
   const searchParams = useSearchParams();
+  const [document, setDocument] = useState<DocumentRecord | null>(null);
   const [pages, setPages] = useState<PageRecord[]>([]);
   const [extractions, setExtractions] = useState<ExtractionRecord[]>([]);
   const [activePage, setActivePage] = useState<number | undefined>(undefined);
@@ -18,7 +19,12 @@ export default function DocumentExtractionPage({ params }: { params: { caseId: s
   const [busy, setBusy] = useState(false);
 
   const refresh = async () => {
-    const [nextPages, nextExtractions] = await Promise.all([listPages(params.docId), listExtractions(params.docId)]);
+    const [nextDocument, nextPages, nextExtractions] = await Promise.all([
+      getDocument(params.docId),
+      listPages(params.docId),
+      listExtractions(params.docId),
+    ]);
+    setDocument(nextDocument);
     setPages(nextPages);
     setExtractions(nextExtractions);
     setActivePage((current) => current || nextPages[0]?.page_number);
@@ -52,9 +58,17 @@ export default function DocumentExtractionPage({ params }: { params: { caseId: s
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
-        <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-dim">
-          Document Extraction
-        </p>
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-dim">
+            Document Extraction
+          </p>
+          <h2 className="mt-1 text-lg font-semibold text-slate-bright">
+            {document?.original_filename || "Source Document"}
+          </h2>
+          <p className="mt-1 text-sm text-slate-dim">
+            {document?.user_category || document?.auto_category || "Unclassified"} · {extractions.length} extracted fields
+          </p>
+        </div>
         <Button
           variant="gold"
           size="sm"
@@ -73,6 +87,7 @@ export default function DocumentExtractionPage({ params }: { params: { caseId: s
       <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
         <PdfViewer
           documentId={params.docId}
+          document={document}
           pages={pages}
           activePage={activePage}
           extractions={extractions}

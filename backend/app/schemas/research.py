@@ -22,6 +22,10 @@ class ResearchItemRead(BaseModel):
     relevance_score: Decimal | None = None
     affected_c: str | None = None
     impact_description: str | None = None
+    entity_scope: str | None = None
+    entity_match_score: Decimal | None = None
+    verification_status: str | None = None
+    matched_terms: str | None = None
+    match_explanation: str | None = None
     created_at: datetime
     updated_at: datetime
-

@@ -32,6 +32,24 @@ const categoryColors: Record<string, string> = {
   regulatory: "text-gold-glow bg-gold/15",
   financial: "text-emerald-glow bg-emerald/15",
   legal: "text-rose-glow bg-rose/15",
+  market: "text-blue-400 bg-blue-400/15",
+  promoter: "text-rose-glow bg-rose/15",
+  sector: "text-slate bg-surface-200",
+};
+
+const INDIAN_SOURCE_LABELS: Record<string, { label: string; badge: string }> = {
+  "Reserve Bank of India": { label: "RBI", badge: "text-gold-glow" },
+  "SEBI": { label: "SEBI", badge: "text-gold-glow" },
+  "National Housing Bank": { label: "NHB", badge: "text-gold-glow" },
+  "Ministry of Corporate Affairs": { label: "MCA", badge: "text-gold-glow" },
+  "NSE India": { label: "NSE", badge: "text-emerald-glow" },
+  "BSE India": { label: "BSE", badge: "text-emerald-glow" },
+  "Trendlyne": { label: "Trendlyne", badge: "text-accent-glow" },
+  "Moneycontrol": { label: "MC", badge: "text-accent-glow" },
+  "Screener.in": { label: "Screener", badge: "text-accent-glow" },
+  "National Company Law Tribunal": { label: "NCLT", badge: "text-rose-glow" },
+  "NCLAT": { label: "NCLAT", badge: "text-rose-glow" },
+  "IBBI": { label: "IBBI", badge: "text-rose-glow" },
 };
 
 export function ResearchCard({
@@ -42,6 +60,7 @@ export function ResearchCard({
   onDelete?: () => Promise<void>;
 }) {
   const relevance = item.relevance_score ? parseFloat(item.relevance_score) : 0;
+  const entityMatch = item.entity_match_score ? parseFloat(item.entity_match_score) : 0;
   const catKey = item.category?.toLowerCase() || "";
   const catColor = categoryColors[catKey] || "text-slate bg-surface-200";
   const catIcon = categoryIcons[catKey] || (
@@ -49,6 +68,23 @@ export function ResearchCard({
       <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
     </svg>
   );
+  const verificationTone =
+    item.verification_status === "verified"
+      ? "success"
+      : item.verification_status === "probable"
+        ? "warn"
+        : item.verification_status === "contextual"
+          ? "info"
+          : "default";
+  const matchedTerms = (() => {
+    if (!item.matched_terms) return [];
+    try {
+      const parsed = JSON.parse(item.matched_terms);
+      return Array.isArray(parsed) ? parsed.slice(0, 4) : [];
+    } catch {
+      return [];
+    }
+  })();
 
   return (
     <div className="panel p-5 transition-all duration-300 hover:border-white/[0.12]">
@@ -68,6 +104,8 @@ export function ResearchCard({
               {item.severity || "low"}
             </Badge>
             {item.affected_c && <Badge tone="info">{item.affected_c}</Badge>}
+            {item.verification_status && <Badge tone={verificationTone}>{item.verification_status}</Badge>}
+            {item.entity_scope && <Badge tone="neutral">{item.entity_scope}</Badge>}
           </div>
 
           {/* Title */}
@@ -83,24 +121,66 @@ export function ResearchCard({
             <p className="mt-2 text-sm text-slate-dim">{item.impact_description}</p>
           )}
 
+          {(item.match_explanation || matchedTerms.length > 0) && (
+            <div className="mt-3 rounded-xl border border-white/[0.06] bg-surface-200/50 p-3">
+              <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-dim">Entity Match</p>
+              {item.match_explanation && <p className="mt-2 text-xs leading-relaxed text-slate">{item.match_explanation}</p>}
+              {matchedTerms.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {matchedTerms.map((term) => (
+                    <span
+                      key={term}
+                      className="rounded-md border border-white/[0.08] bg-surface-300/60 px-2 py-1 text-[11px] text-slate"
+                    >
+                      {term}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Relevance score bar */}
-          {relevance > 0 && (
-            <div className="mt-4">
-              <div className="flex items-center justify-between">
-                <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-dim">Relevance</p>
-                <span className="text-[11px] font-semibold text-slate-bright">{Math.round(relevance * 100)}%</span>
-              </div>
-              <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-surface-200">
-                <div
-                  className="h-full rounded-full bg-gradient-to-r from-accent to-accent-glow transition-all duration-500"
-                  style={{ width: `${Math.min(relevance * 100, 100)}%` }}
-                />
-              </div>
+          {(relevance > 0 || entityMatch > 0) && (
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              {relevance > 0 && (
+                <div>
+                  <div className="flex items-center justify-between">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-dim">Relevance</p>
+                    <span className="text-[11px] font-semibold text-slate-bright">{Math.round(relevance * 100)}%</span>
+                  </div>
+                  <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-surface-200">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-accent to-accent-glow transition-all duration-500"
+                      style={{ width: `${Math.min(relevance * 100, 100)}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+              {entityMatch > 0 && (
+                <div>
+                  <div className="flex items-center justify-between">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-dim">Entity Match</p>
+                    <span className="text-[11px] font-semibold text-slate-bright">{Math.round(entityMatch * 100)}%</span>
+                  </div>
+                  <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-surface-200">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-gold to-gold-glow transition-all duration-500"
+                      style={{ width: `${Math.min(entityMatch * 100, 100)}%` }}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
           {/* Source URL + meta */}
           <div className="mt-4 flex flex-wrap items-center gap-4">
+            {item.source_name && INDIAN_SOURCE_LABELS[item.source_name] && (
+              <span className={`inline-flex items-center rounded-md border border-white/[0.08] px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.15em] ${INDIAN_SOURCE_LABELS[item.source_name].badge}`}>
+                {INDIAN_SOURCE_LABELS[item.source_name].label}
+              </span>
+            )}
             {item.source_url && (
               <a
                 className="inline-flex items-center gap-1.5 text-xs font-medium text-accent-glow transition-colors hover:text-accent"

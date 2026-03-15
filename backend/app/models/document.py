@@ -25,9 +25,40 @@ class Document(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     classification_status: Mapped[str] = mapped_column(String(32), default="pending")
 
     processing_status: Mapped[str] = mapped_column(String(32), default="pending")
+    failure_reason: Mapped[str | None] = mapped_column(Text)
     total_pages: Mapped[int | None]
     raw_markdown: Mapped[str | None] = mapped_column(Text)
 
     case = relationship("Case", back_populates="documents")
     pages = relationship("Page", back_populates="document", cascade="all, delete-orphan")
     extractions = relationship("Extraction", back_populates="document", cascade="all, delete-orphan")
+
+    @property
+    def current_stage(self) -> str:
+        stage_map = {
+            "pending": "pending",
+            "queued": "queued",
+            "triaging": "triaging",
+            "parsing": "parsing",
+            "classifying": "classifying",
+            "extracting": "extracting",
+            "extracted": "completed",
+            "completed": "completed",
+            "failed": "failed",
+        }
+        return stage_map.get(self.processing_status, self.processing_status or "pending")
+
+    @property
+    def progress_percent(self) -> int:
+        progress_map = {
+            "pending": 0,
+            "queued": 5,
+            "triaging": 15,
+            "parsing": 55,
+            "classifying": 72,
+            "extracting": 88,
+            "extracted": 100,
+            "completed": 100,
+            "failed": 100,
+        }
+        return progress_map.get(self.processing_status, 0)

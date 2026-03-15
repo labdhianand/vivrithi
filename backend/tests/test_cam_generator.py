@@ -63,6 +63,8 @@ def test_generate_cam_sections_carries_evidence_refs() -> None:
         source_url="https://example.com/sector",
         source_name="Example Research",
         impact_description="Stable funding environment.",
+        verification_status="contextual",
+        entity_scope="sector",
     )
     five_cs = {
         "character": _score(
