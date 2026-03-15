@@ -34,40 +34,32 @@ def get_all_pdfs() -> list[dict]:
 
 
 def run_stock_docling(pdf_path: str) -> dict:
-    """Run stock Docling DocumentConverter."""
-    from docling.document_converter import DocumentConverter
+    """Run the active Marker-backed adapter."""
+    from backend.app.services.runtime.docling_adapter import DoclingBackend
 
-    converter = DocumentConverter()
+    converter = DoclingBackend()
     t0 = time.time()
-    result = converter.convert(pdf_path)
+    result = converter.convert(Path(pdf_path))
     elapsed = time.time() - t0
-
-    document = result.document
-    markdown = document.export_to_markdown()
-    text = document.export_to_text()
-    page_count = len(document.pages)
-    tables = [item for item in document.iterate_items() if hasattr(item, 'data') and hasattr(item.data, 'table_cells')]
 
     return {
         "status": "ok",
         "time_s": round(elapsed, 2),
-        "markdown_length": len(markdown),
-        "text_length": len(text),
-        "pages_returned": page_count,
-        "markdown": markdown,
+        "markdown_length": len(result.markdown),
+        "text_length": len(result.text),
+        "pages_returned": result.page_count,
+        "markdown": result.markdown,
     }
 
 
 def run_fastfork(pdf_path: str) -> dict:
-    """Run FastFork converter."""
-    from docling.experimental.fastfork import FastForkDocumentConverter
+    """Run the active fast document runtime."""
+    from backend.app.services.runtime import build_fast_artifact
 
-    converter = FastForkDocumentConverter(max_workers=8, fallback_to_docling_for_scans=True)
     t0 = time.time()
-    run = converter.convert(Path(pdf_path))
+    artifact = build_fast_artifact(Path(pdf_path))
     elapsed = time.time() - t0
 
-    artifact = run.fast_artifact
     return {
         "status": "ok",
         "time_s": round(elapsed, 2),
@@ -75,9 +67,9 @@ def run_fastfork(pdf_path: str) -> dict:
         "text_length": len(artifact.text),
         "pages_returned": artifact.page_count,
         "tables_found": len(artifact.tables),
-        "used_docling_fallback": run.used_docling_fallback,
-        "fallback_pages": run.fallback_page_numbers,
-        "timings": run.timings,
+        "used_docling_fallback": False,
+        "fallback_pages": [],
+        "timings": {},
         "markdown": artifact.markdown,
     }
 

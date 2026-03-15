@@ -10,9 +10,8 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
   "aiosqlite>=0.20.0",
-  "asyncssh>=2.17.0",
-  "beautifulsoup4>=4.13.0",
   "fastapi>=0.115.0",
+  "firecrawl-py>=0.0.16",
   "google-genai>=1.16.1",
   "httpx>=0.28.0",
   "pydantic-settings>=2.7.0",
@@ -27,7 +26,6 @@ dependencies = [
   "numpy>=1.26.0",
   "sqlalchemy>=2.0.36",
   "uvicorn[standard]>=0.32.1",
-  "yfinance>=0.2.54",
 ]
 
 [project.optional-dependencies]
@@ -36,9 +34,7 @@ dev = [
   "pytest-asyncio>=0.24.0",
   "ruff>=0.9.0",
 ]
-bench = [
-  "docling>=2.78.0",
-]
+bench = []
 
 [tool.setuptools.packages.find]
 where = ["."]

@@ -1,21 +1,18 @@
 import type { Metadata } from "next";
-import { Instrument_Serif, Sora } from "next/font/google";
+import { Fraunces, Manrope } from "next/font/google";
 
-import { Header } from "@/components/layout/header";
-import { Sidebar } from "@/components/layout/sidebar";
-import { StageStepper } from "@/components/layout/stage-stepper";
+import { AppShell } from "@/components/layout/app-shell";
 
 import "./globals.css";
 
-const sora = Sora({
+const manrope = Manrope({
   subsets: ["latin"],
-  variable: "--font-sora",
+  variable: "--font-manrope",
 });
 
-const instrumentSerif = Instrument_Serif({
+const fraunces = Fraunces({
   subsets: ["latin"],
-  variable: "--font-instrument-serif",
-  weight: "400",
+  variable: "--font-fraunces",
 });
 
 export const metadata: Metadata = {
@@ -25,16 +22,9 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${sora.variable} ${instrumentSerif.variable}`}>
+    <html lang="en" className={`${manrope.variable} ${fraunces.variable}`}>
       <body className="noise">
-        <div className="mx-auto flex max-w-[1640px] gap-5 px-5 py-5">
-          <Sidebar />
-          <main className="flex-1 space-y-5">
-            <Header />
-            <StageStepper />
-            {children}
-          </main>
-        </div>
+        <AppShell>{children}</AppShell>
       </body>
     </html>
   );

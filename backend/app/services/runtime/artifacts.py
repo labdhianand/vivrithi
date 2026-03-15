@@ -4,8 +4,6 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
-from docling_core.transforms.chunker.hybrid_chunker import HybridChunker
-
 from ..utils import clean_text
 from .docling_adapter import DoclingBackend, DoclingResult
 from .docling_remote import get_docling_remote_backend
@@ -97,35 +95,6 @@ def _bbox_from_geometry(box: GeometryBox | None) -> ArtifactBBox | None:
     if box is None:
         return None
     return ArtifactBBox(x1=box.x1, y1=box.y1, x2=box.x2, y2=box.y2)
-
-
-def _bbox_from_docling_prov(prov: dict | None, page_sizes: dict[int, tuple[float, float]]) -> ArtifactBBox | None:
-    if not prov:
-        return None
-    bbox = prov.get("bbox") or {}
-    page_number = prov.get("page_no")
-    if not page_number or page_number not in page_sizes:
-        return None
-    width, height = page_sizes[page_number]
-    coord_origin = bbox.get("coord_origin", "TOPLEFT")
-    left = float(bbox.get("l", 0.0))
-    right = float(bbox.get("r", 0.0))
-    top = float(bbox.get("t", 0.0))
-    bottom = float(bbox.get("b", 0.0))
-    if coord_origin == "BOTTOMLEFT":
-        y1 = (height - top) / height
-        y2 = (height - bottom) / height
-    else:
-        y1 = top / height
-        y2 = bottom / height
-    x1 = left / width
-    x2 = right / width
-    return ArtifactBBox(
-        x1=round(min(x1, x2), 6),
-        y1=round(min(y1, y2), 6),
-        x2=round(max(x1, x2), 6),
-        y2=round(max(y1, y2), 6),
-    )
 
 
 def _simple_fast_chunks(result: FastPipelineResult, max_chars: int = 1400) -> list[ArtifactChunk]:
@@ -304,122 +273,14 @@ def artifact_from_fast_result(result: FastPipelineResult) -> DocumentArtifact:
 
 def artifact_from_docling(pdf_path: Path, backend: DoclingBackend) -> DocumentArtifact:
     result: DoclingResult = backend.convert(pdf_path)
-    raw_doc = result.document
-    raw_dict = raw_doc.export_to_dict()
-    page_sizes = {
-        int(page_no): (float(payload["size"]["width"]), float(payload["size"]["height"]))
-        for page_no, payload in raw_dict["pages"].items()
-    }
-
-    pages = [
-        ArtifactPage(
-            page_number=page_no,
-            width=width,
-            height=height,
-            has_text_layer=True,
-            has_tables=any(
-                (table.get("prov") or [{}])[0].get("page_no") == page_no for table in raw_dict.get("tables", [])
-            ),
-            is_scanned=False,
-            route="docling",
-        )
-        for page_no, (width, height) in sorted(page_sizes.items())
-    ]
-
-    text_blocks: list[ArtifactTextBlock] = []
-    for index, item in enumerate(raw_dict.get("texts", [])):
-        prov = (item.get("prov") or [{}])[0]
-        page_number = int(prov.get("page_no", 0) or 0)
-        text_blocks.append(
-            ArtifactTextBlock(
-                block_id=item.get("self_ref", f"text-{index}"),
-                page_number=page_number,
-                label=str(item.get("label", "text")),
-                text=item.get("text") or item.get("orig") or "",
-                bbox=_bbox_from_docling_prov(prov, page_sizes),
-                reading_order_index=index,
-                source_engine="docling",
-            )
-        )
-    tables: list[ArtifactTable] = []
-    for table_index, item in enumerate(raw_dict.get("tables", [])):
-        prov = (item.get("prov") or [{}])[0]
-        page_number = int(prov.get("page_no", 0) or 0)
-        data = item.get("data") or {}
-        cells: list[ArtifactTableCell] = []
-        max_row = 0
-        max_col = 0
-        for cell in data.get("table_cells", []):
-            row_index = int(cell.get("start_row_offset_idx", 0))
-            column_index = int(cell.get("start_col_offset_idx", 0))
-            max_row = max(max_row, int(cell.get("end_row_offset_idx", 0)))
-            max_col = max(max_col, int(cell.get("end_col_offset_idx", 0)))
-            cells.append(
-                ArtifactTableCell(
-                    row_index=row_index,
-                    column_index=column_index,
-                    text=cell.get("text", ""),
-                    bbox=_bbox_from_docling_prov({"page_no": page_number, "bbox": cell.get("bbox")}, page_sizes),
-                )
-            )
-        tables.append(
-            ArtifactTable(
-                table_id=item.get("self_ref", f"table-{table_index}"),
-                page_number=page_number,
-                bbox=_bbox_from_docling_prov(prov, page_sizes),
-                markdown="",
-                row_count=max_row,
-                column_count=max_col,
-                cells=cells,
-                source_engine="docling",
-            )
-        )
-
-    chunker = HybridChunker()
-    doc_chunks = list(chunker.chunk(raw_doc))
-    chunks: list[ArtifactChunk] = []
-    for chunk_index, chunk in enumerate(doc_chunks):
-        meta = chunk.meta.model_dump()
-        page_numbers = sorted(
-            {
-                int(prov.get("page_no"))
-                for item in meta.get("doc_items", [])
-                for prov in item.get("prov", [])
-                if prov.get("page_no") is not None
-            }
-        )
-        block_ids = [item.get("self_ref", "") for item in meta.get("doc_items", [])]
-        chunks.append(
-            ArtifactChunk(
-                chunk_id=f"docling-chunk-{chunk_index}",
-                text=chunk.text,
-                page_numbers=page_numbers,
-                block_ids=block_ids,
-                headings=meta.get("headings") or [],
-                source_engine="docling",
-            )
-        )
-
-    return DocumentArtifact(
-        backend="docling",
-        document_name=pdf_path.name,
-        source_path=str(pdf_path),
-        page_count=result.page_count,
-        parse_seconds=round(result.convert_seconds, 6),
-        markdown=result.markdown,
-        text=result.text,
-        pages=pages,
-        text_blocks=text_blocks,
-        tables=tables,
-        reading_order=[block.block_id for block in sorted(text_blocks, key=lambda item: item.reading_order_index)],
-        chunks=chunks,
-        raw_exports={
-            "dict": raw_dict,
-            "html": raw_doc.export_to_html(),
-            "doctags": raw_doc.export_to_doctags(),
-            "document_tokens": raw_doc.export_to_document_tokens(),
-        },
-    )
+    payload = result.document if isinstance(result.document, dict) else {}
+    payload.setdefault("document_name", pdf_path.name)
+    payload.setdefault("source_path", str(pdf_path))
+    payload.setdefault("page_count", result.page_count)
+    payload.setdefault("convert_seconds", round(result.convert_seconds, 6))
+    payload.setdefault("markdown", result.markdown)
+    payload.setdefault("text", result.text)
+    return artifact_from_remote_payload(payload)
 
 
 async def build_fast_artifact(pdf_path: Path, category: str | None = None, max_workers: int = 8) -> DocumentArtifact:
@@ -434,6 +295,7 @@ def build_docling_artifact(pdf_path: Path) -> DocumentArtifact:
 
 
 def artifact_from_remote_payload(payload: dict[str, Any]) -> DocumentArtifact:
+    backend_name = str(payload.get("backend") or payload.get("method") or "docling_gpu_remote")
     pages = [
         ArtifactPage(
             page_number=int(page["page_number"]),
@@ -442,7 +304,7 @@ def artifact_from_remote_payload(payload: dict[str, Any]) -> DocumentArtifact:
             has_text_layer=bool(page.get("text")),
             has_tables=bool(page.get("tables")),
             is_scanned=False,
-            route="docling_gpu_remote",
+            route=str(page.get("route") or page.get("parser_used") or backend_name),
         )
         for page in payload.get("pages", [])
     ]
@@ -454,7 +316,7 @@ def artifact_from_remote_payload(payload: dict[str, Any]) -> DocumentArtifact:
             text=block.get("text") or "",
             bbox=ArtifactBBox(*block["bbox"]) if block.get("bbox") else None,
             reading_order_index=int(block.get("reading_order_index") or index),
-            source_engine=str(block.get("source_engine") or "docling_gpu_remote"),
+            source_engine=str(block.get("source_engine") or backend_name),
         )
         for index, block in enumerate(payload.get("text_blocks", []))
     ]
@@ -478,11 +340,11 @@ def artifact_from_remote_payload(payload: dict[str, Any]) -> DocumentArtifact:
                 row_count=int(table.get("row_count") or 0),
                 column_count=int(table.get("column_count") or 0),
                 cells=cells,
-                source_engine=str(table.get("source_engine") or "docling_gpu_remote"),
+                source_engine=str(table.get("source_engine") or backend_name),
             )
         )
     return DocumentArtifact(
-        backend="docling_gpu_remote",
+        backend=backend_name,
         document_name=payload.get("document_name") or "",
         source_path=payload.get("source_path") or "",
         page_count=int(payload.get("page_count") or 0),
@@ -507,7 +369,7 @@ def artifact_from_remote_payload(payload: dict[str, Any]) -> DocumentArtifact:
                 page_numbers=[page.page_number],
                 block_ids=[block.block_id for block in text_blocks if block.page_number == page.page_number],
                 headings=[],
-                source_engine="docling_gpu_remote",
+                source_engine=backend_name,
             )
             for page in pages
         ],

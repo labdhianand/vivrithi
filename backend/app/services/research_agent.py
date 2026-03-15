@@ -2,19 +2,25 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
+import os
 import re
 from dataclasses import dataclass
 from datetime import date
+from typing import Optional
 from urllib.parse import parse_qs, quote_plus, unquote, urlsplit, urlunsplit
 
-import httpx
-import yfinance as yf
-from bs4 import BeautifulSoup
+from firecrawl import FirecrawlApp
 
 from ..config import get_settings
 from ..models.case import Case
 from ..models.extraction import Extraction
 from .utils import clamp
+
+
+logger = logging.getLogger(__name__)
+FIRECRAWL_API_KEY = os.getenv("FIRECRAWL_API_KEY", "")
+_firecrawl_client: Optional[FirecrawlApp] = None
 
 
 OFFICIAL_SOURCE_NAMES = {
@@ -110,6 +116,21 @@ class EntityMatch:
     status: str
     matched_terms: tuple[str, ...]
     explanation: str
+
+
+def _configured_firecrawl_key() -> str:
+    settings = get_settings()
+    return settings.firecrawl_api_key or FIRECRAWL_API_KEY
+
+
+def _get_client() -> FirecrawlApp:
+    global _firecrawl_client
+    api_key = _configured_firecrawl_key()
+    if not api_key:
+        raise RuntimeError("FIRECRAWL_API_KEY is not configured")
+    if _firecrawl_client is None:
+        _firecrawl_client = FirecrawlApp(api_key=api_key)
+    return _firecrawl_client
 
 
 def _compact_text(value: str | None) -> str:
@@ -329,26 +350,38 @@ async def tavily_search(
     max_results: int = 5,
     include_domains: tuple[str, ...] | None = None,
 ) -> list[dict]:
-    settings = get_settings()
-    if not settings.tavily_api_key:
-        return []
-    payload = {
-        "api_key": settings.tavily_api_key,
-        "query": query,
-        "search_depth": "advanced",
-        "max_results": max_results,
-        "include_answer": False,
-        "include_raw_content": False,
-    }
-    if include_domains:
-        payload["include_domains"] = list(include_domains)
     try:
-        async with httpx.AsyncClient(timeout=settings.research_timeout_seconds) as client:
-            response = await client.post("https://api.tavily.com/search", json=payload)
-            response.raise_for_status()
-        data = response.json()
-        return data.get("results", []) if isinstance(data, dict) else []
-    except Exception:
+        decorated_query = query
+        if include_domains:
+            decorated_query = f"{query} {' '.join(f'site:{domain}' for domain in include_domains)}"
+
+        def _search() -> list[dict]:
+            raw_results = _get_client().search(decorated_query, limit=max_results)
+            if isinstance(raw_results, dict):
+                items = raw_results.get("data")
+                if isinstance(items, list):
+                    return items
+            if isinstance(raw_results, list):
+                return raw_results
+            return []
+
+        results = await asyncio.to_thread(_search)
+        normalized: list[dict] = []
+        for item in results:
+            if not isinstance(item, dict):
+                continue
+            normalized.append(
+                {
+                    "title": item.get("title", ""),
+                    "url": item.get("url", ""),
+                    "content": item.get("markdown", item.get("description", "")),
+                    "summary": item.get("description", ""),
+                    "published_date": item.get("publishedDate") or item.get("published_date"),
+                }
+            )
+        return normalized
+    except Exception as exc:
+        logger.error("Firecrawl search failed for '%s': %s", query, exc)
         return []
 
 
@@ -358,86 +391,168 @@ async def duckduckgo_search(
     max_results: int = 5,
     site_filters: tuple[str, ...] | None = None,
 ) -> list[dict]:
-    decorated_query = query
-    if site_filters:
-        decorated_query = f"{query} {' '.join(f'site:{domain}' for domain in site_filters)}"
-    url = f"https://duckduckgo.com/html/?q={quote_plus(decorated_query)}"
-    settings = get_settings()
+    return await tavily_search(query, max_results=max_results, include_domains=site_filters)
+
+
+async def firecrawl_scrape(url: str) -> dict:
+    if not url:
+        return {}
     try:
-        async with httpx.AsyncClient(timeout=settings.research_timeout_seconds, follow_redirects=True) as client:
-            response = await client.get(url, headers={"User-Agent": "Mozilla/5.0"})
-            response.raise_for_status()
-    except Exception:
-        return []
-    soup = BeautifulSoup(response.text, "html.parser")
+        def _scrape() -> dict:
+            raw_result = _get_client().scrape_url(
+                url,
+                params={"formats": ["markdown"]},
+            )
+            return raw_result if isinstance(raw_result, dict) else {}
+
+        body = await asyncio.to_thread(_scrape)
+    except Exception as exc:
+        logger.error("Firecrawl scrape failed for %s: %s", url, exc)
+        return {}
+    data = body.get("data") if isinstance(body.get("data"), dict) else body
+    if not isinstance(data, dict):
+        return {}
+    metadata = data.get("metadata") if isinstance(data.get("metadata"), dict) else {}
+    return {
+        "title": _compact_text(str(data.get("title") or metadata.get("title") or "")),
+        "summary": _compact_text(
+            str(
+                data.get("description")
+                or metadata.get("description")
+                or metadata.get("excerpt")
+                or ""
+            )
+        ),
+        "markdown": _compact_text(str(data.get("markdown") or data.get("content") or "")),
+        "published_date": _maybe_parse_date(
+            data.get("publishedDate")
+            or metadata.get("publishedTime")
+            or metadata.get("publishedDate")
+            or ""
+        ),
+    }
+
+
+def _firecrawl_search_sync(
+    query: str,
+    *,
+    limit: int = 5,
+    include_domains: tuple[str, ...] | None = None,
+) -> list[dict]:
+    try:
+        decorated_query = query
+        if include_domains:
+            decorated_query = f"{query} {' '.join(f'site:{domain}' for domain in include_domains)}"
+        raw_results = _get_client().search(decorated_query, limit=limit)
+        if isinstance(raw_results, dict):
+            items = raw_results.get("data")
+            if isinstance(items, list):
+                return [item for item in items if isinstance(item, dict)]
+        if isinstance(raw_results, list):
+            return [item for item in raw_results if isinstance(item, dict)]
+    except Exception as exc:
+        logger.error("Firecrawl search failed for '%s': %s", query, exc)
+    return []
+
+
+def _firecrawl_scrape_markdown_sync(url: str) -> str:
+    if not url:
+        return ""
+    try:
+        raw_result = _get_client().scrape_url(url, params={"formats": ["markdown"]})
+    except Exception as exc:
+        logger.error("Firecrawl scrape failed for %s: %s", url, exc)
+        return ""
+    data = raw_result.get("data") if isinstance(raw_result, dict) and isinstance(raw_result.get("data"), dict) else raw_result
+    if not isinstance(data, dict):
+        return ""
+    return _compact_text(str(data.get("markdown") or data.get("content") or ""))
+
+
+def _search_items_from_firecrawl(
+    query: str,
+    *,
+    limit: int = 5,
+    include_domains: tuple[str, ...] | None = None,
+) -> list[dict]:
     items: list[dict] = []
-    for result in soup.select(".result")[:max_results]:
-        link = result.select_one(".result__a")
-        snippet = result.select_one(".result__snippet")
-        if not link:
-            continue
+    for result in _firecrawl_search_sync(query, limit=limit, include_domains=include_domains):
         items.append(
             {
-                "title": link.get_text(" ", strip=True),
-                "url": _unwrap_redirect_url(link.get("href", "")),
-                "content": snippet.get_text(" ", strip=True) if snippet else "",
+                "title": _compact_text(str(result.get("title") or "")),
+                "url": _compact_text(str(result.get("url") or "")),
+                "summary": _compact_text(
+                    str(result.get("markdown") or result.get("description") or result.get("content") or "")
+                )[:600],
+                "source": "firecrawl_search",
             }
         )
     return items
 
 
-async def firecrawl_scrape(url: str) -> dict:
-    settings = get_settings()
-    if not settings.firecrawl_api_key or not url:
-        return {}
-    endpoint = settings.firecrawl_base_url.rstrip("/") + "/scrape"
-    payload = {"url": url, "formats": ["markdown"], "onlyMainContent": True}
-    headers = {"Authorization": f"Bearer {settings.firecrawl_api_key}"}
-    try:
-        async with httpx.AsyncClient(timeout=settings.research_timeout_seconds, follow_redirects=True) as client:
-            response = await client.post(endpoint, headers=headers, json=payload)
-            response.raise_for_status()
-        body = response.json()
-    except Exception:
-        return {}
-    if not isinstance(body, dict):
-        return {}
-    data = body.get("data")
-    if not isinstance(data, dict):
-        return {}
-    metadata = data.get("metadata") if isinstance(data.get("metadata"), dict) else {}
-    return {
-        "title": _compact_text(str(metadata.get("title", ""))),
-        "summary": _compact_text(str(metadata.get("description", ""))),
-        "markdown": _compact_text(str(data.get("markdown", ""))),
-        "published_date": _maybe_parse_date(metadata.get("publishedTime") or metadata.get("publishedDate") or ""),
-    }
-
-
 def get_market_data(nse_symbol: str | None) -> dict | None:
-    if not nse_symbol:
-        return None
-    try:
-        ticker = yf.Ticker(f"{nse_symbol}.NS")
-        info = ticker.info or {}
-        history = ticker.history(period="1y")
-        if history.empty:
-            one_year_return = None
-        else:
-            start = float(history["Close"].iloc[0])
-            end = float(history["Close"].iloc[-1])
-            one_year_return = round(((end - start) / start) * 100, 2) if start else None
-        return {
-            "current_price": info.get("currentPrice"),
-            "market_cap_crore": round(info.get("marketCap", 0) / 1e7, 2) if info.get("marketCap") else None,
-            "pe_ratio": info.get("trailingPE"),
-            "pb_ratio": info.get("priceToBook"),
-            "fifty_two_week_high": info.get("fiftyTwoWeekHigh"),
-            "fifty_two_week_low": info.get("fiftyTwoWeekLow"),
-            "one_year_return_percent": one_year_return,
-        }
-    except Exception:
-        return None
+    return None
+
+
+def search_company_news(company_name: str, sector: str) -> list[dict]:
+    return _search_items_from_firecrawl(
+        f"{company_name} {sector} India financial news 2024 2025",
+        limit=5,
+    )
+
+
+def search_litigation(company_name: str) -> list[dict]:
+    return _search_items_from_firecrawl(
+        f"{company_name} India court case NPA default legal notice",
+        limit=5,
+    )
+
+
+def search_promoter_background(company_name: str) -> list[dict]:
+    return _search_items_from_firecrawl(
+        f"{company_name} promoter director India background management",
+        limit=5,
+    )
+
+
+def search_sector_outlook(sector: str) -> list[dict]:
+    return _search_items_from_firecrawl(
+        f"India {sector} sector outlook RBI SEBI regulation 2024 2025",
+        limit=5,
+    )
+
+
+def scrape_mca_data(cin: str) -> str:
+    return _firecrawl_scrape_markdown_sync(f"https://www.zaubacorp.com/company/NA/{cin}")
+
+
+def run_research(company_name: str, sector: str, cin: str) -> dict:
+    logger.info("Starting Firecrawl research for %s", company_name)
+
+    news = search_company_news(company_name, sector)
+    litigation = search_litigation(company_name)
+    promoter = search_promoter_background(company_name)
+    sector_data = search_sector_outlook(sector)
+    mca_data = scrape_mca_data(cin)
+
+    logger.info(
+        "Research complete: %s news, %s litigation, %s promoter items",
+        len(news),
+        len(litigation),
+        len(promoter),
+    )
+
+    return {
+        "news": news,
+        "litigation": litigation,
+        "promoter_info": promoter,
+        "sector_outlook": sector_data,
+        "mca_data": mca_data,
+        "company_name": company_name,
+        "sector": sector,
+        "cin": cin,
+        "research_tool": "firecrawl",
+    }
 
 
 def _build_search_plans(context: ResearchContext) -> list[SearchPlan]:

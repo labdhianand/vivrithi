@@ -4,21 +4,29 @@
 
 :root {
   color-scheme: dark;
-  --accent: #06b6d4;
-  --surface: #080d1a;
+  --accent: #4f7cff;
+  --surface: #09111f;
 }
 
 html {
-  background: #080d1a;
+  background: #09111f;
 }
 
 body {
   @apply min-h-screen bg-surface font-sans text-slate-bright antialiased;
   background-image:
-    radial-gradient(at 40% 20%, hsla(187, 85%, 35%, 0.08) 0px, transparent 50%),
-    radial-gradient(at 80% 0%, hsla(189, 75%, 30%, 0.06) 0px, transparent 50%),
-    radial-gradient(at 0% 80%, hsla(265, 55%, 30%, 0.05) 0px, transparent 50%);
+    radial-gradient(at 18% 18%, rgba(79, 124, 255, 0.14) 0px, transparent 44%),
+    radial-gradient(at 82% 0%, rgba(34, 176, 125, 0.1) 0px, transparent 42%),
+    radial-gradient(at 50% 100%, rgba(214, 166, 85, 0.08) 0px, transparent 50%);
   background-attachment: fixed;
+  letter-spacing: -0.01em;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  letter-spacing: -0.03em;
 }
 
 a {
@@ -38,24 +46,24 @@ a {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.2);
+  background: rgba(114, 128, 155, 0.28);
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(148, 163, 184, 0.35);
+  background: rgba(156, 184, 255, 0.34);
 }
 
 /* Glass panel */
 .panel {
-  @apply rounded-2xl border border-white/[0.06] bg-surface-100/80 shadow-card backdrop-blur-xl;
+  @apply rounded-[24px] border border-white/[0.08] shadow-card backdrop-blur-2xl;
+  background-color: rgba(20, 32, 56, 0.82);
 }
 
 .panel-glow {
   @apply panel;
   box-shadow:
-    0 1px 3px rgba(0, 0, 0, 0.3),
-    0 8px 24px rgba(0, 0, 0, 0.2),
-    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    0 20px 48px rgba(2, 9, 24, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
 /* Subtle grid background */
@@ -68,14 +76,14 @@ a {
 
 /* Gradient text */
 .text-gradient {
-  background: linear-gradient(135deg, #06b6d4 0%, #22d3ee 50%, #67e8f9 100%);
+  background: linear-gradient(135deg, #7aa0ff 0%, #c6d6ff 48%, #75d3ad 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
 
 .text-gradient-gold {
-  background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 50%, #fcd34d 100%);
+  background: linear-gradient(135deg, #c89444 0%, #f0cb85 55%, #f7e0b6 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -91,7 +99,7 @@ a {
   inset: 0;
   border-radius: inherit;
   padding: 1px;
-  background: linear-gradient(135deg, rgba(6, 182, 212, 0.3), transparent 50%, rgba(245, 158, 11, 0.2));
+  background: linear-gradient(135deg, rgba(79, 124, 255, 0.32), transparent 52%, rgba(214, 166, 85, 0.22));
   -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
@@ -119,5 +127,10 @@ a {
 /* Focus ring */
 input:focus, select:focus, textarea:focus, button:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px rgba(6, 182, 212, 0.4);
+  box-shadow: 0 0 0 2px rgba(79, 124, 255, 0.38);
+}
+
+::selection {
+  background: rgba(79, 124, 255, 0.28);
+  color: #f8fbff;
 }

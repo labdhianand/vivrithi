@@ -1,71 +1,91 @@
 "use client";
 
-import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-
 interface Props {
   value: Record<string, string>;
+  errors: Record<string, string>;
   onChange: (next: Record<string, string>) => void;
 }
 
 const loanTypeOptions = [
-  { value: "term_loan", label: "Term Loan" },
-  { value: "working_capital", label: "Working Capital" },
-  { value: "project_finance", label: "Project Finance" },
-  { value: "ncd", label: "Non-Convertible Debenture" },
-  { value: "line_of_credit", label: "Line of Credit" },
-  { value: "other", label: "Other" },
+  "Term Loan",
+  "Working Capital",
+  "Cash Credit",
+  "Letter of Credit",
+  "Bank Guarantee",
+  "ECLGS",
+  "Other",
 ];
 
-export function LoanForm({ value, onChange }: Props) {
+function Field({
+  label,
+  error,
+  children,
+}: {
+  label: string;
+  error?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <label className="mb-1.5 block text-sm font-semibold text-slate-800">{label}</label>
+      {children}
+      {error ? <p className="mt-1 text-sm text-red-500">{error}</p> : null}
+    </div>
+  );
+}
+
+export function LoanForm({ value, errors, onChange }: Props) {
   const setField = (key: string, nextValue: string) => onChange({ ...value, [key]: nextValue });
 
   return (
-    <div className="space-y-5">
-      <div className="grid gap-4 md:grid-cols-2">
-        <div className="animate-fade-in stagger-1">
-          <Select
-            label="Loan type"
-            options={loanTypeOptions}
-            value={value.loan_type || ""}
-            onChange={(event) => setField("loan_type", event.target.value)}
-          />
-        </div>
-        <div className="animate-fade-in stagger-2">
-          <Input
-            label="Amount (crore)"
-            placeholder="Requested loan amount"
-            value={value.loan_amount_crore || ""}
-            onChange={(event) => setField("loan_amount_crore", event.target.value)}
-          />
-        </div>
-        <div className="animate-fade-in stagger-3">
-          <Input
-            label="Tenure (months)"
-            placeholder="Loan tenure in months"
-            value={value.loan_tenure_months || ""}
-            onChange={(event) => setField("loan_tenure_months", event.target.value)}
-          />
-        </div>
-        <div className="animate-fade-in stagger-4">
-          <Input
-            label="Proposed rate (%)"
-            placeholder="Annual interest rate"
-            value={value.proposed_rate_percent || ""}
-            onChange={(event) => setField("proposed_rate_percent", event.target.value)}
-          />
-        </div>
-      </div>
-      <div className="animate-fade-in stagger-5">
-        <Textarea
-          label="Loan purpose"
-          rows={3}
-          placeholder="Describe the intended use of funds"
-          value={value.loan_purpose || ""}
-          onChange={(event) => setField("loan_purpose", event.target.value)}
+    <div className="grid gap-5 md:grid-cols-2">
+      <Field label="Loan Type" error={errors.loan_type}>
+        <select
+          value={value.loan_type || ""}
+          onChange={(event) => setField("loan_type", event.target.value)}
+          className="w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3.5 py-2.5 text-slate-800 shadow-sm shadow-slate-100/50 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[#4f7cff]"
+        >
+          <option value="">Select loan type</option>
+          {loanTypeOptions.map((option) => (
+            <option key={option} value={option}>
+              {option}
+            </option>
+          ))}
+        </select>
+      </Field>
+
+      <Field label="Loan Amount" error={errors.loan_amount_crore}>
+        <input
+          type="number"
+          inputMode="decimal"
+          value={value.loan_amount_crore || ""}
+          onChange={(event) => setField("loan_amount_crore", event.target.value)}
+          placeholder="in Crores"
+          className="w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3.5 py-2.5 text-slate-800 shadow-sm shadow-slate-100/50 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[#4f7cff]"
         />
-      </div>
+      </Field>
+
+      <Field label="Tenure" error={errors.loan_tenure_months}>
+        <input
+          type="number"
+          inputMode="numeric"
+          value={value.loan_tenure_months || ""}
+          onChange={(event) => setField("loan_tenure_months", event.target.value)}
+          placeholder="in months"
+          className="w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3.5 py-2.5 text-slate-800 shadow-sm shadow-slate-100/50 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[#4f7cff]"
+        />
+      </Field>
+
+      <Field label="Interest Rate" error={errors.proposed_rate_percent}>
+        <input
+          type="number"
+          inputMode="decimal"
+          value={value.proposed_rate_percent || ""}
+          onChange={(event) => setField("proposed_rate_percent", event.target.value)}
+          placeholder="% p.a."
+          className="w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3.5 py-2.5 text-slate-800 shadow-sm shadow-slate-100/50 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[#4f7cff]"
+        />
+      </Field>
     </div>
   );
 }

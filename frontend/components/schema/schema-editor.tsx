@@ -1,299 +1,306 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import type { ExtractionRecord, SchemaField } from "@/lib/types";
-import { cn } from "@/lib/utils";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
 
-const FIELD_TYPES = ["text", "number", "percentage", "currency_lakhs", "currency_crore", "date", "json"];
+const FIELD_TYPES = [
+  { value: "text", label: "Text" },
+  { value: "number", label: "Number" },
+  { value: "percentage", label: "Percentage" },
+  { value: "currency_crore", label: "Currency (Cr)" },
+  { value: "date", label: "Date" },
+] as const;
+
+const REQUIRED_DEFAULTS: Record<string, SchemaField[]> = {
+  Annual_Report: [
+    { key: "total_revenue_crore", label: "Revenue FY24 (Cr)", type: "currency_crore", required: true },
+    { key: "revenue_fy23_crore", label: "Revenue FY23 (Cr)", type: "currency_crore", required: false },
+    { key: "net_profit_fy24_crore", label: "Net Profit FY24 (Cr)", type: "currency_crore", required: false },
+    { key: "ebitda_fy24_crore", label: "EBITDA FY24 (Cr)", type: "currency_crore", required: false },
+    { key: "total_debt_crore", label: "Total Debt (Cr)", type: "currency_crore", required: false },
+    { key: "net_worth_crore", label: "Net Worth (Cr)", type: "currency_crore", required: true },
+    { key: "debt_equity_ratio", label: "Debt/Equity Ratio", type: "number", required: false },
+    { key: "interest_coverage_ratio", label: "Interest Coverage Ratio", type: "number", required: false },
+    { key: "auditor_name", label: "Auditor Name", type: "text", required: false },
+    { key: "auditor_opinion", label: "Auditor Opinion", type: "text", required: false },
+    { key: "going_concern_flag", label: "Going Concern Flag", type: "text", required: false },
+  ],
+  ALM: [
+    { key: "total_assets_crore", label: "Total Assets (Cr)", type: "currency_crore", required: false },
+    { key: "total_liabilities_crore", label: "Total Liabilities (Cr)", type: "currency_crore", required: false },
+    { key: "asset_bucket_0_1yr_crore", label: "0-1yr Asset Bucket (Cr)", type: "currency_crore", required: false },
+    { key: "liability_bucket_0_1yr_crore", label: "0-1yr Liability Bucket (Cr)", type: "currency_crore", required: false },
+    { key: "gap_1_3yr_crore", label: "1-3yr Gap (Cr)", type: "currency_crore", required: false },
+    { key: "gap_3_5yr_crore", label: "3-5yr Gap (Cr)", type: "currency_crore", required: false },
+    { key: "lcr_ratio", label: "Liquidity Coverage Ratio", type: "percentage", required: true },
+    { key: "nsfr_ratio", label: "Net Stable Funding Ratio", type: "percentage", required: false },
+  ],
+  Shareholding_Pattern: [
+    { key: "promoter_holding_percent", label: "Promoter Holding %", type: "percentage", required: true },
+    { key: "shares_pledged_percent", label: "Promoter Pledge %", type: "percentage", required: false },
+    { key: "fii_holding_percent", label: "FII Holding %", type: "percentage", required: false },
+    { key: "dii_holding_percent", label: "DII Holding %", type: "percentage", required: false },
+    { key: "public_holding_percent", label: "Public Holding %", type: "percentage", required: false },
+    { key: "promoter_holding_change_qoq", label: "Change in Promoter Holding QoQ", type: "percentage", required: false },
+  ],
+  Borrowing_Profile: [
+    { key: "total_outstanding_debt_crore", label: "Total Outstanding Debt (Cr)", type: "currency_crore", required: false },
+    { key: "secured_debt_crore", label: "Secured Debt (Cr)", type: "currency_crore", required: false },
+    { key: "unsecured_debt_crore", label: "Unsecured Debt (Cr)", type: "currency_crore", required: false },
+    { key: "number_of_lenders", label: "Number of Lenders", type: "number", required: false },
+    { key: "highest_single_lender_exposure_percent", label: "Highest Single Lender Exposure %", type: "percentage", required: false },
+    { key: "average_cost_of_borrowing_percent", label: "Average Cost of Borrowing %", type: "percentage", required: false },
+    { key: "nearest_repayment_amount_crore", label: "Nearest Repayment Amount (Cr)", type: "currency_crore", required: false },
+    { key: "nearest_repayment_date", label: "Nearest Repayment Date", type: "date", required: false },
+  ],
+  Portfolio_Performance: [
+    { key: "total_aum_crore", label: "Total AUM (Cr)", type: "currency_crore", required: false },
+    { key: "gnpa_percent", label: "Gross NPA %", type: "percentage", required: false },
+    { key: "nnpa_percent", label: "Net NPA %", type: "percentage", required: false },
+    { key: "collection_efficiency_percent", label: "Collection Efficiency %", type: "percentage", required: false },
+    { key: "capital_adequacy_ratio", label: "Capital Adequacy Ratio", type: "percentage", required: false },
+    { key: "cost_of_funds_percent", label: "Cost of Funds %", type: "percentage", required: false },
+    { key: "yield_on_advances_percent", label: "Yield on Advances %", type: "percentage", required: false },
+    { key: "aum_growth_yoy_percent", label: "AUM Growth YoY %", type: "percentage", required: false },
+  ],
+};
+
+function mergeDefaults(category: string, fields: SchemaField[]) {
+  const defaults = REQUIRED_DEFAULTS[category] || [];
+  const existing = new Map(fields.map((field) => [field.key, field]));
+  for (const field of defaults) {
+    if (!existing.has(field.key)) {
+      existing.set(field.key, field);
+    }
+  }
+  return Array.from(existing.values());
+}
 
 export function SchemaEditor({
   category,
   initialFields,
   extractionPreview,
   previewDocumentName,
+  previewDocumentId,
   onSave,
+  onRunExtraction,
+  onUpdateExtraction,
 }: {
   category: string;
   initialFields: SchemaField[];
   extractionPreview?: Record<string, ExtractionRecord>;
   previewDocumentName?: string | null;
+  previewDocumentId?: string | null;
   onSave: (fields: SchemaField[]) => Promise<void>;
+  onRunExtraction?: () => Promise<void>;
+  onUpdateExtraction?: (extractionId: string, value: string) => Promise<void>;
 }) {
-  const [fields, setFields] = useState<SchemaField[]>(initialFields);
-  const [busy, setBusy] = useState(false);
-  const [search, setSearch] = useState("");
-  const [typeFilter, setTypeFilter] = useState("all");
-  const [requirementFilter, setRequirementFilter] = useState("all");
+  const [fields, setFields] = useState<SchemaField[]>(() => mergeDefaults(category, initialFields));
+  const [saving, setSaving] = useState(false);
+  const [extracting, setExtracting] = useState(false);
+  const [newFieldLabel, setNewFieldLabel] = useState("");
+  const [newFieldType, setNewFieldType] = useState("text");
+  const [editingFieldKey, setEditingFieldKey] = useState<string | null>(null);
+  const [draftValue, setDraftValue] = useState("");
 
   useEffect(() => {
-    setFields(initialFields);
-  }, [initialFields]);
+    setFields(mergeDefaults(category, initialFields));
+  }, [category, initialFields]);
 
-  const updateField = (index: number, partial: Partial<SchemaField>) => {
-    setFields((current) =>
-      current.map((field, currentIndex) => (currentIndex === index ? { ...field, ...partial } : field)),
-    );
-  };
-
-  const handleSave = async () => {
-    setBusy(true);
-    await onSave(fields);
-    setBusy(false);
-  };
-
-  const visibleFields = fields
-    .map((field, index) => ({ field, index }))
-    .filter(({ field }) => {
-      const query = search.trim().toLowerCase();
-      const matchesSearch =
-        !query ||
-        field.key.toLowerCase().includes(query) ||
-        field.label.toLowerCase().includes(query) ||
-        (field.description || "").toLowerCase().includes(query);
-      const matchesType = typeFilter === "all" || field.type === typeFilter;
-      const matchesRequirement =
-        requirementFilter === "all" ||
-        (requirementFilter === "required" && field.required) ||
-        (requirementFilter === "optional" && !field.required);
-      return matchesSearch && matchesType && matchesRequirement;
-    });
-
-  const requiredCount = fields.filter((field) => field.required).length;
-  const optionalCount = fields.length - requiredCount;
-
-  const summarizePreviewValue = (field: SchemaField, preview: ExtractionRecord | undefined) => {
-    const rawValue = preview?.user_edited_value || preview?.value || "";
-    if (!rawValue) {
-      return null;
-    }
-
-    if (field.type === "json") {
-      try {
-        const parsed = JSON.parse(rawValue);
-        if (Array.isArray(parsed)) {
-          const first = parsed[0];
-          if (first && typeof first === "object") {
-            const sample = Object.values(first)
-              .filter((value) => value !== null && value !== undefined && `${value}`.trim())
-              .slice(0, 2)
-              .join(" | ");
-            return `${parsed.length} item${parsed.length === 1 ? "" : "s"}${sample ? `: ${sample}` : ""}`;
-          }
-          return `${parsed.length} item${parsed.length === 1 ? "" : "s"}`;
-        }
-        if (parsed && typeof parsed === "object") {
-          return `${Object.keys(parsed).length} keys`;
-        }
-      } catch {
-        // Fall through to text summarization if the payload is not valid JSON.
-      }
-    }
-
-    const compact = rawValue.replace(/\s+/g, " ").trim();
-    if (compact.length <= 140) {
-      return compact;
-    }
-    return `${compact.slice(0, 137)}...`;
-  };
+  const orderedFields = useMemo(() => fields, [fields]);
 
   return (
-    <Card className="space-y-5" id={`schema-${category}`}>
-      {/* Header */}
+    <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm" id={`schema-${category}`}>
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-dim">
-            Schema
-          </p>
-          <h3 className="mt-1 text-base font-semibold text-slate-bright">{category}</h3>
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <Badge tone="neutral">{fields.length} total fields</Badge>
-            <Badge tone="info">{requiredCount} required</Badge>
-            <Badge tone="neutral">{optionalCount} optional</Badge>
-            {previewDocumentName && <Badge tone="success">Previewing {previewDocumentName}</Badge>}
-          </div>
+          <h3 className="text-xl font-semibold text-slate-900">{category.replace(/_/g, " ")}</h3>
+          <p className="mt-1 text-sm text-slate-500">{orderedFields.length} schema fields configured.</p>
+          {previewDocumentName ? <p className="mt-2 text-sm text-slate-500">Previewing {previewDocumentName}</p> : null}
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() =>
-              setFields((current) => [
-                ...current,
-                { key: "", label: "", type: "text", required: false, description: "" },
-              ])
-            }
+        <div className="flex flex-wrap gap-3">
+          {previewDocumentId && onRunExtraction ? (
+            <button
+              type="button"
+              disabled={extracting}
+              onClick={async () => {
+                try {
+                  setExtracting(true);
+                  await onRunExtraction();
+                } finally {
+                  setExtracting(false);
+                }
+              }}
+              className="rounded-lg border border-slate-300 bg-white px-4 py-2 font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
+            >
+              {extracting ? "Running..." : "Run extraction"}
+            </button>
+          ) : null}
+          <button
+            type="button"
+            disabled={saving}
+            onClick={async () => {
+              try {
+                setSaving(true);
+                await onSave(fields);
+              } finally {
+                setSaving(false);
+              }
+            }}
+            className="rounded-lg bg-blue-600 px-4 py-2 font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
           >
-            + Add field
-          </Button>
+            {saving ? "Saving..." : "Save schema"}
+          </button>
         </div>
       </div>
 
-      <div className="grid gap-3 rounded-2xl border border-white/[0.06] bg-surface-200/30 p-4 lg:grid-cols-[1.4fr_180px_180px_auto]">
-        <Input
-          value={search}
-          placeholder="Search by key, label, or notes"
-          onChange={(event) => setSearch(event.target.value)}
+      <div className="mt-6 grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 md:grid-cols-[1fr_220px_120px]">
+        <input
+          value={newFieldLabel}
+          onChange={(event) => setNewFieldLabel(event.target.value)}
+          placeholder="Add field label"
+          className="w-full rounded-lg border border-slate-300 px-3 py-2 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
-        <Select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}>
-          <option value="all">All types</option>
-          {FIELD_TYPES.map((type) => (
-            <option key={type} value={type}>
-              {type}
+        <select
+          value={newFieldType}
+          onChange={(event) => setNewFieldType(event.target.value)}
+          className="w-full rounded-lg border border-slate-300 px-3 py-2 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          {FIELD_TYPES.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
             </option>
           ))}
-        </Select>
-        <Select value={requirementFilter} onChange={(event) => setRequirementFilter(event.target.value)}>
-          <option value="all">All fields</option>
-          <option value="required">Required only</option>
-          <option value="optional">Optional only</option>
-        </Select>
-        <div className="flex items-center justify-between gap-3 rounded-xl border border-white/[0.06] px-4 py-2 text-sm text-slate lg:justify-center">
-          <span>Showing</span>
-          <Badge tone="neutral">{visibleFields.length}</Badge>
-        </div>
+        </select>
+        <button
+          type="button"
+          onClick={() => {
+            if (!newFieldLabel.trim()) {
+              return;
+            }
+            const key = newFieldLabel.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_");
+            setFields((current) => [...current, { key, label: newFieldLabel.trim(), type: newFieldType, required: false }]);
+            setNewFieldLabel("");
+            setNewFieldType("text");
+          }}
+          className="rounded-lg bg-blue-600 px-4 py-2 font-medium text-white transition-colors hover:bg-blue-700"
+        >
+          Add
+        </button>
       </div>
 
-      {/* Field rows */}
-      <div className="space-y-2">
-        <div className="hidden px-4 lg:grid lg:grid-cols-[110px_1fr_1fr_0.8fr_1.05fr_140px_90px] lg:gap-3">
-          <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-dim">Field</p>
-          <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-dim">Key</p>
-          <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-dim">Label</p>
-          <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-dim">Type</p>
-          <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-dim">Extracted Value</p>
-          <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-dim">Requirement</p>
-          <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-dim">Action</p>
-        </div>
-
-        {visibleFields.map(({ field, index }) => (
-          <div
-            key={`${field.key}-${index}`}
-            className={cn(
-              "grid gap-3 overflow-hidden rounded-2xl border border-white/[0.06] p-4",
-              "lg:grid-cols-[110px_1fr_1fr_0.8fr_1.05fr_140px_90px]",
-              index % 2 === 0 ? "bg-surface-200/40" : "bg-surface-100/30",
-              "transition-all duration-200 hover:border-white/[0.12] hover:bg-surface-200/60",
-            )}
-          >
-            {(() => {
-              const preview = extractionPreview?.[field.key];
-              const previewValue = preview?.user_edited_value || preview?.value || null;
-              const isMissingRequired = !previewValue && field.required;
-              const previewSummary = summarizePreviewValue(field, preview);
-              return (
-                <>
-            <div className="min-w-0 flex items-center gap-2">
-              <Badge tone={field.required ? "info" : "neutral"}>{field.required ? "Required" : "Optional"}</Badge>
-              <span className="text-xs text-slate-dim">#{index + 1}</span>
+      <div className="mt-6 space-y-3">
+        {orderedFields.map((field) => (
+          <div key={field.key} className="grid gap-3 rounded-xl border border-slate-200 p-4 md:grid-cols-[1.3fr_180px_120px_80px]">
+            <div>
+              <p className="text-sm font-medium text-slate-900">{field.label}</p>
+              <p className="mt-1 text-xs text-slate-500">{field.key}</p>
             </div>
-
-            <div className="min-w-0">
-              <Input
-                value={field.key}
-                placeholder="field_key"
-                onChange={(event) => updateField(index, { key: event.target.value })}
-              />
-            </div>
-            <div className="min-w-0">
-              <Input
-                value={field.label}
-                placeholder="Label"
-                onChange={(event) => updateField(index, { label: event.target.value })}
-              />
-            </div>
-            <div className="min-w-0">
-              <Select value={field.type} onChange={(event) => updateField(index, { type: event.target.value })}>
-                {FIELD_TYPES.map((type) => (
-                  <option key={type} value={type}>
-                    {type}
-                  </option>
-                ))}
-              </Select>
-            </div>
-
-            <div className="min-w-0 rounded-xl border border-white/[0.06] bg-surface-200/70 px-3 py-2.5">
-              <div className="flex items-start justify-between gap-2">
-                <p
-                  className={cn("min-w-0 text-sm leading-5", previewValue ? "text-slate-bright" : "text-slate-dim")}
-                  title={previewValue || undefined}
-                >
-                  <span className="block overflow-hidden text-ellipsis whitespace-nowrap">
-                    {previewSummary || (field.required ? "Missing required value" : "No extracted value")}
-                  </span>
-                </p>
-                {preview?.confidence && (
-                  <Badge tone="neutral" className="shrink-0">
-                    {Math.round(Number(preview.confidence) * 100)}%
-                  </Badge>
-                )}
-              </div>
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                {preview?.source_page_number && <Badge tone="info">Page {preview.source_page_number}</Badge>}
-                {preview?.extraction_method && (
-                  <Badge tone={isMissingRequired ? "danger" : "neutral"}>{preview.extraction_method}</Badge>
-                )}
-                {field.type === "json" && previewValue && <Badge tone="neutral">JSON preview</Badge>}
-                {isMissingRequired && !preview?.extraction_method && <Badge tone="danger">missing_required</Badge>}
-              </div>
-            </div>
-
-            {/* Required checkbox - dark themed */}
-            <label
-              className={cn(
-                "flex cursor-pointer items-center gap-2 rounded-xl border border-white/[0.06] px-3 py-2.5 text-sm transition-all duration-200",
-                "bg-surface-200 text-slate hover:border-white/[0.12]",
-                field.required && "border-accent/30 text-accent-glow",
-              )}
+            <select
+              value={field.type}
+              onChange={(event) =>
+                setFields((current) =>
+                  current.map((item) => (item.key === field.key ? { ...item, type: event.target.value } : item)),
+                )
+              }
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
+              {FIELD_TYPES.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <label className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700">
               <input
-                checked={field.required}
                 type="checkbox"
-                className="accent-accent"
-                onChange={(event) => updateField(index, { required: event.target.checked })}
+                checked={field.required}
+                onChange={(event) =>
+                  setFields((current) =>
+                    current.map((item) => (item.key === field.key ? { ...item, required: event.target.checked } : item)),
+                  )
+                }
               />
-              <span className="text-xs">{field.required ? "Required" : "Optional"}</span>
+              Required
             </label>
-
-            <Button
-              variant="danger"
-              size="sm"
-              onClick={() => setFields((current) => current.filter((_, i) => i !== index))}
+            <button
+              type="button"
+              onClick={() => setFields((current) => current.filter((item) => item.key !== field.key))}
+              className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
             >
-              Remove
-            </Button>
-                </>
-              );
-            })()}
+              X
+            </button>
           </div>
         ))}
       </div>
 
-      {visibleFields.length === 0 && (
-        <div className="rounded-xl border border-dashed border-white/[0.06] py-8 text-center">
-          <p className="text-sm text-slate-dim">
-            {fields.length === 0
-              ? 'No fields defined. Click "+ Add field" to begin.'
-              : "No fields match the current search or filters."}
-          </p>
+      {orderedFields.length === 0 ? (
+        <div className="mt-6 rounded-xl border border-dashed border-slate-300 px-4 py-8 text-center text-slate-500">
+          No schema fields configured yet.
         </div>
-      )}
+      ) : null}
 
-      {/* Footer actions */}
-      <div className="flex flex-col gap-3 border-t border-white/[0.06] pt-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-wrap items-center gap-2 text-sm text-slate-dim">
-          <Badge tone="neutral">{fields.length} fields</Badge>
-          <span>Required fields are treated as compulsory during extraction review.</span>
+      <div className="mt-8">
+        <h4 className="text-lg font-semibold text-slate-900">Extraction Results</h4>
+        <div className="mt-4 overflow-hidden rounded-xl border border-slate-200">
+          <div className="grid grid-cols-[1.2fr_1.4fr_140px] bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700">
+            <span>Field</span>
+            <span>Extracted Value</span>
+            <span>Edit</span>
+          </div>
+          {orderedFields.map((field) => {
+            const preview = extractionPreview?.[field.key];
+            const value = preview?.user_edited_value || preview?.value || "";
+            const missing = !value;
+            const editing = editingFieldKey === field.key;
+            return (
+              <div key={`preview-${field.key}`} className="grid grid-cols-[1.2fr_1.4fr_140px] border-t border-slate-200 px-4 py-3 text-sm">
+                <span className="font-medium text-slate-900">{field.label}</span>
+                {editing ? (
+                  <input
+                    value={draftValue}
+                    onChange={(event) => setDraftValue(event.target.value)}
+                    className="rounded-lg border border-slate-300 px-3 py-2 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                ) : (
+                  <span className={missing ? "rounded-lg bg-amber-50 px-3 py-2 italic text-amber-800" : "text-slate-700"}>
+                    {missing ? "Not found - enter manually" : value}
+                  </span>
+                )}
+                <div>
+                  {editing ? (
+                    <button
+                      type="button"
+                      disabled={!preview?.id || !onUpdateExtraction}
+                      onClick={async () => {
+                        if (!preview?.id || !onUpdateExtraction) {
+                          return;
+                        }
+                        await onUpdateExtraction(preview.id, draftValue);
+                        setEditingFieldKey(null);
+                      }}
+                      className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
+                    >
+                      Save
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingFieldKey(field.key);
+                        setDraftValue(value);
+                      }}
+                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+                    >
+                      Edit
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
-        <Button variant="primary" disabled={busy} onClick={handleSave}>
-          {busy ? "Saving\u2026" : "Save schema"}
-        </Button>
       </div>
-    </Card>
+    </div>
   );
 }

@@ -86,12 +86,32 @@ def score_character(
             }
         )
 
-    if isinstance(shares_pledged, Decimal) and shares_pledged > 20:
+    if isinstance(shares_pledged, Decimal) and shares_pledged > 75:
+        score -= 25
+        factors.append(
+            {
+                "signal": "Critical promoter pledge",
+                "impact": -25,
+                "evidence": f"CRITICAL: Promoter pledge at {shares_pledged}% - very high default risk indicator",
+                "evidence_refs": [first_extraction_ref(extraction_index, "shares_pledged_percent")],
+            }
+        )
+    elif isinstance(shares_pledged, Decimal) and shares_pledged > 50:
         score -= 15
         factors.append(
             {
-                "signal": "High share pledge",
+                "signal": "Elevated promoter pledge",
                 "impact": -15,
+                "evidence": f"Promoter pledge at {shares_pledged}% - financial stress signal",
+                "evidence_refs": [first_extraction_ref(extraction_index, "shares_pledged_percent")],
+            }
+        )
+    elif isinstance(shares_pledged, Decimal) and shares_pledged > 20:
+        score -= 8
+        factors.append(
+            {
+                "signal": "High share pledge",
+                "impact": -8,
                 "evidence": f"{shares_pledged}%",
                 "evidence_refs": [first_extraction_ref(extraction_index, "shares_pledged_percent")],
             }
@@ -210,13 +230,23 @@ def score_capacity(
                 "evidence_refs": [first_extraction_ref(extraction_index, "gnpa_percent")],
             }
         )
+    elif isinstance(gnpa, Decimal) and gnpa > 10:
+        score -= 18
+        factors.append(
+            {
+                "signal": "Major gross NPA concern",
+                "impact": -18,
+                "evidence": f"Gross NPA at {gnpa}% - major credit quality concern",
+                "evidence_refs": [first_extraction_ref(extraction_index, "gnpa_percent")],
+            }
+        )
     elif isinstance(gnpa, Decimal) and gnpa > 5:
         score -= 10
         factors.append(
             {
                 "signal": "Elevated GNPA",
                 "impact": -10,
-                "evidence": f"GNPA {gnpa}%",
+                "evidence": f"Gross NPA at {gnpa}% - elevated NPA warrants further scrutiny",
                 "evidence_refs": [first_extraction_ref(extraction_index, "gnpa_percent")],
             }
         )
@@ -345,6 +375,26 @@ def score_collateral(
                 "signal": "Asset quality supportive",
                 "impact": 8,
                 "evidence": f"GNPA {gnpa}%",
+                "evidence_refs": [first_extraction_ref(extraction_index, "gnpa_percent")],
+            }
+        )
+    elif isinstance(gnpa, Decimal) and gnpa > 10:
+        score -= 12
+        factors.append(
+            {
+                "signal": "Collateral coverage under stress",
+                "impact": -12,
+                "evidence": f"Gross NPA at {gnpa}% - major credit quality concern",
+                "evidence_refs": [first_extraction_ref(extraction_index, "gnpa_percent")],
+            }
+        )
+    elif isinstance(gnpa, Decimal) and gnpa > 5:
+        score -= 6
+        factors.append(
+            {
+                "signal": "Asset quality requires scrutiny",
+                "impact": -6,
+                "evidence": f"Gross NPA at {gnpa}% - elevated NPA warrants further scrutiny",
                 "evidence_refs": [first_extraction_ref(extraction_index, "gnpa_percent")],
             }
         )

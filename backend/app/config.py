@@ -36,26 +36,11 @@ class Settings(BaseSettings):
     storage_root: Path = ROOT_DIR / "backend" / "storage"
     storage_bucket: str = "intelli-credit-docs"
     max_upload_size_mb: int = 50
-    document_processing_backend: str = "docling_remote"
+    document_processing_backend: str = "marker_remote"
     document_processing_max_workers: int = 8
     document_batch_max_concurrency: int = 4
 
-    docling_remote_host: str | None = None
-    docling_remote_port: int = 22
-    docling_remote_username: str | None = None
-    docling_remote_password: str | None = None
-    docling_remote_client_key_path: str | None = None
-    docling_remote_known_hosts: str | None = None
-    docling_remote_python_bin: str = "python3.10"
-    docling_remote_workspace: str = "~/.intelli_credit_docling"
-    docling_remote_venv: str = "~/.intelli_credit_docling/.venv"
-    docling_remote_enable_bootstrap: bool = True
-    docling_remote_bootstrap_torch_index_url: str = "https://download.pytorch.org/whl/cu128"
-    docling_remote_page_batch_size: int = 128
-    docling_remote_layout_batch_size: int = 128
-    docling_remote_ocr_batch_size: int = 96
-    docling_remote_table_batch_size: int = 4
-    docling_remote_document_timeout_seconds: int = 1800
+    marker_api_url: str = "http://127.0.0.1:8001"
 
     gemini_api_key: str | None = None
     gemini_text_model: str = "gemini-2.5-flash"
@@ -63,9 +48,7 @@ class Settings(BaseSettings):
     gemini_context_char_limit: int = 200_000
     classification_require_llm: bool = True
     landing_ai_api_key: str | None = None
-    tavily_api_key: str | None = None
-    firecrawl_api_key: str | None = None
-    firecrawl_base_url: str = "https://api.firecrawl.dev/v2"
+    firecrawl_api_key: str = ""
     research_max_results: int = 18
     research_timeout_seconds: float = 20.0
     research_min_entity_match_score: float = 0.55
@@ -73,12 +56,6 @@ class Settings(BaseSettings):
     research_max_pages_to_scrape: int = 16
     sentry_dsn: str | None = None
     request_id_header: str = "X-Request-ID"
-    databricks_host: str | None = None
-    databricks_token: str | None = None
-    databricks_warehouse_id: str | None = None
-    databricks_catalog: str | None = None
-    databricks_schema: str | None = None
-    databricks_timeout_seconds: float = 30.0
     supabase_url: str | None = None
     supabase_key: str | None = None
     api_key: str = ""

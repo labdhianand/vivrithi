@@ -28,10 +28,10 @@ export function CaseNav({ caseId }: { caseId: string }) {
             key={tab.key}
             href={href}
             className={cn(
-              "rounded-xl px-3.5 py-2 text-xs font-medium transition-all duration-200",
+              "rounded-xl px-3.5 py-2 text-xs font-semibold uppercase tracking-[0.12em] transition-all duration-200",
               active
-                ? "bg-accent/15 text-accent-glow border border-accent/20"
-                : "text-slate-dim hover:text-slate-bright hover:bg-white/[0.04]",
+                ? "border border-white/[0.14] bg-white/[0.08] text-slate-bright"
+                : "text-slate-dim hover:bg-white/[0.05] hover:text-slate-bright",
             )}
           >
             {tab.label}

@@ -9,15 +9,15 @@ type Props = PropsWithChildren<ButtonHTMLAttributes<HTMLButtonElement>> & {
 
 const variants = {
   primary:
-    "bg-accent text-surface font-semibold hover:bg-accent-glow shadow-glow hover:shadow-[0_0_48px_rgba(6,182,212,0.3)] active:scale-[0.97]",
+    "bg-accent text-white font-semibold hover:bg-[#648eff] shadow-glow hover:shadow-[0_22px_46px_rgba(79,124,255,0.28)] active:scale-[0.98]",
   secondary:
-    "bg-surface-300 text-slate-bright border border-white/[0.08] hover:bg-surface-400 hover:border-white/[0.12]",
+    "border border-white/[0.1] bg-white/[0.04] text-slate-bright hover:border-white/[0.16] hover:bg-white/[0.08]",
   ghost:
-    "bg-transparent text-slate hover:text-slate-bright hover:bg-white/[0.04]",
+    "bg-transparent text-slate hover:text-slate-bright hover:bg-white/[0.06]",
   danger:
-    "bg-rose-dim text-white hover:bg-rose shadow-glow-rose active:scale-[0.97]",
+    "bg-rose-dim text-white hover:bg-rose shadow-glow-rose active:scale-[0.98]",
   gold:
-    "bg-gold-dim text-surface font-semibold hover:bg-gold shadow-glow-gold active:scale-[0.97]",
+    "bg-gold-dim text-surface font-semibold hover:bg-gold shadow-glow-gold active:scale-[0.98]",
 };
 
 const sizes = {
@@ -30,7 +30,7 @@ export function Button({ className, variant = "primary", size = "md", children, 
   return (
     <button
       className={cn(
-        "inline-flex items-center justify-center gap-2 rounded-xl font-medium transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-40",
+        "inline-flex items-center justify-center gap-2 rounded-xl font-medium tracking-[0.01em] transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-40",
         variants[variant],
         sizes[size],
         className,

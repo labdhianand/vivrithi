@@ -128,6 +128,7 @@ Return a JSON object with exactly these fields:
 - "signals": array of 1-3 short signal labels describing what was detected
 
 Consider Indian credit context: RBI regulations, CIBIL, GST compliance, NPA norms, promoter governance, NBFC/HFC specific risks.
+CIBIL Commercial score range is -1 to 300. Score >250 = low risk, 200-250 = medium, <200 = high risk.
 Return ONLY valid JSON, no markdown."""
 
     try:

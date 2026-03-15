@@ -29,7 +29,7 @@ export function Header() {
   return (
     <header className="panel flex items-center justify-between p-4">
       <div>
-        <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] text-slate-dim">
+        <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-dim/[0.85]">
           {getBreadcrumbs().map((crumb, i) => (
             <span key={i} className="flex items-center gap-2">
               {i > 0 && <span className="text-white/20">/</span>}
@@ -37,12 +37,12 @@ export function Header() {
             </span>
           ))}
         </div>
-        <h2 className="mt-1.5 text-xl font-semibold text-slate-bright">{getTitle()}</h2>
+        <h2 className="mt-2 text-[1.35rem] font-semibold tracking-tight text-slate-bright">{getTitle()}</h2>
       </div>
       <div className="flex items-center gap-3">
-        <div className="flex items-center gap-2 rounded-xl border border-emerald/20 bg-emerald/10 px-3 py-1.5">
+        <div className="flex items-center gap-2 rounded-full border border-emerald/20 bg-emerald/[0.12] px-3.5 py-1.5">
           <span className="h-2 w-2 rounded-full bg-emerald animate-pulse" />
-          <span className="text-xs text-emerald-glow">System Online</span>
+          <span className="text-xs font-medium text-emerald-glow">System Online</span>
         </div>
       </div>
     </header>

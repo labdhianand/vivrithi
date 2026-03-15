@@ -242,7 +242,7 @@ async def _process_document_docling_remote(session: AsyncSession, case: Case, do
             is_scanned=is_scanned,
             has_tables=has_tables,
             content_type=content_type,
-            parser_used="docling_gpu_remote",
+            parser_used=parsed_page.parser_used or remote_result.payload.get("backend") or "docling_gpu_remote",
             raw_text=parsed_page.text,
             raw_markdown=parsed_page.markdown,
             page_image_path=None,
@@ -390,6 +390,14 @@ async def process_document(
         return await _process_document_legacy(session, case, document)
     if selected_backend in {"fast", "fast_runtime"}:
         return await _process_document_fast(session, case, document)
-    if selected_backend in {"docling", "docling_remote", "docling_gpu", "docling_gpu_remote"}:
+    if selected_backend in {
+        "docling",
+        "docling_remote",
+        "docling_gpu",
+        "docling_gpu_remote",
+        "marker",
+        "marker_api",
+        "marker_remote",
+    }:
         return await _process_document_docling_remote(session, case, document)
     raise ValueError(f"Unsupported document processing backend: {selected_backend}")

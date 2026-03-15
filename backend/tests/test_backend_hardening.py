@@ -13,7 +13,6 @@ from backend.app.main import app
 from backend.app.models.case import Case
 from backend.app.models.document import Document
 from backend.app.models.extraction import Extraction
-from backend.app.services.databricks import DatabricksService
 from backend.app.services.extractor import extract_with_schema
 from backend.app.services.markdown_builder import build_document_markdown
 from backend.app.services.recommendation import build_improvement_scenarios
@@ -199,23 +198,6 @@ def test_extract_with_schema_preserves_spreadsheet_evidence() -> None:
     assert results[0].row_label == "Gross NPA"
     assert results[0].column_header == "Q3 FY26"
     assert results[0].cell_reference == "B2"
-
-
-def test_databricks_stub_builds_case_queries_and_unconfigured_health() -> None:
-    service = DatabricksService()
-    health = asyncio.run(service.healthcheck())
-    assert health.configured is False
-    assert health.reachable is False
-
-    case = SimpleNamespace(
-        company_name="Acme Finance Limited",
-        cin="L12345KA2010PLC000001",
-        pan="AACCA1234A",
-    )
-    queries = service.build_case_query_templates(case)
-    assert "gst_returns" in queries
-    assert "income_tax_returns" in queries["itr"]
-    assert case.pan in queries["bank_statements"]
 
 
 def test_recommendation_improvement_scenarios_are_actionable() -> None:

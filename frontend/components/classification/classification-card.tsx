@@ -2,17 +2,16 @@
 
 import { useState } from "react";
 
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Select } from "@/components/ui/select";
-import { DOCUMENT_CATEGORIES } from "@/lib/utils";
 import type { DocumentRecord } from "@/lib/types";
+import { DOCUMENT_CATEGORIES } from "@/lib/utils";
 
-function confidenceTone(score: number): "default" | "success" | "warn" | "danger" {
-  if (score >= 0.85) return "success";
-  if (score >= 0.6) return "warn";
-  return "danger";
+function badgeClass(category: string) {
+  const key = category.toLowerCase();
+  if (key.includes("annual")) return "bg-blue-50 text-blue-700";
+  if (key.includes("share")) return "bg-amber-50 text-amber-700";
+  if (key.includes("borrow")) return "bg-emerald-50 text-emerald-700";
+  if (key.includes("portfolio")) return "bg-purple-50 text-purple-700";
+  return "bg-slate-100 text-slate-700";
 }
 
 export function ClassificationCard({
@@ -24,179 +23,101 @@ export function ClassificationCard({
   onApprove: (category: string) => Promise<void>;
   onReject: () => Promise<void>;
 }) {
-  const [category, setCategory] = useState(document.user_category || document.auto_category || "ALM");
-  const [approving, setApproving] = useState(false);
-  const [rejecting, setRejecting] = useState(false);
-  const confidence = document.auto_category_confidence ? Number(document.auto_category_confidence) : 0;
-  const confidencePercent = Math.round(confidence * 100);
-  const progressPercent = Math.max(0, Math.min(100, document.progress_percent ?? 0));
-  const readyForApproval = ["extracted", "completed"].includes(document.processing_status);
-  const alreadyApproved = ["approved", "user_approved"].includes(document.classification_status);
-  const isRejected = document.classification_status === "rejected";
+  const [category, setCategory] = useState(document.user_category || document.auto_category || DOCUMENT_CATEGORIES[0]);
+  const [busy, setBusy] = useState<"approve" | "reject" | null>(null);
+  const confidence = Math.round(Number(document.auto_category_confidence || 0) * 100);
+  const approved = ["approved", "user_approved"].includes(document.classification_status);
+  const rejected = document.classification_status === "rejected";
+  const reviewed = approved || rejected;
 
   return (
-    <Card>
-      <div className="flex flex-wrap items-start justify-between gap-6">
-        {/* Left: Document info */}
+    <div
+      className={`rounded-xl bg-white p-6 shadow-sm border border-slate-200 ${
+        approved ? "border-l-4 border-emerald-500" : rejected ? "border-l-4 border-red-400 opacity-60" : ""
+      }`}
+    >
+      <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0 flex-1">
-          <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-dim">
-            Classifier output
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="max-w-full truncate text-lg font-semibold text-slate-900">{document.original_filename}</h3>
+            {approved ? (
+              <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-700">Approved</span>
+            ) : null}
+            {rejected ? (
+              <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-medium text-red-700">Rejected</span>
+            ) : null}
+          </div>
+
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <span className={`rounded-full px-3 py-1 text-sm font-medium ${badgeClass(category)}`}>
+              {(document.auto_category || category).replace(/_/g, " ")}
+            </span>
+            <span className="text-sm text-slate-600">Confidence {confidence}%</span>
+          </div>
+
+          <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-200">
+            <div
+              className="h-full rounded-full bg-blue-600 transition-all"
+              style={{ width: `${Math.max(confidence, 4)}%` }}
+            />
+          </div>
+
+          <p className="mt-3 text-sm text-slate-500">
+            {document.auto_category
+              ? `Predicted from layout signals and first-page content for ${(document.auto_category || "").replace(/_/g, " ")}.`
+              : "Awaiting AI classification output."}
           </p>
-          <h3 className="mt-2 truncate text-base font-semibold text-slate-bright">
-            {document.original_filename}
-          </h3>
+        </div>
 
-          {/* Classification status row */}
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <Badge tone={alreadyApproved ? "success" : isRejected ? "danger" : "neutral"}>
-              {document.classification_status}
-            </Badge>
-            <Badge
-              tone={document.processing_status === "extracted" || document.processing_status === "completed" ? "success" : document.processing_status === "failed" ? "danger" : "info"}
-              pulse={!readyForApproval && document.processing_status !== "failed"}
+        {!reviewed ? (
+          <div className="w-full max-w-sm space-y-3">
+            <select
+              value={category}
+              onChange={(event) => setCategory(event.target.value)}
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              {document.processing_status}
-            </Badge>
-          </div>
+              {DOCUMENT_CATEGORIES.map((option) => (
+                <option key={option} value={option}>
+                  {option.replace(/_/g, " ")}
+                </option>
+              ))}
+            </select>
 
-          {/* Auto-detected category with confidence */}
-          <div className="mt-4 rounded-xl border border-white/[0.06] bg-surface-200/60 p-3.5">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-dim">
-                  Auto-detected category
-                </p>
-                <p className="mt-1 text-sm font-medium text-slate-bright">
-                  {document.auto_category || "Pending"}
-                </p>
-              </div>
-              <div className="text-right">
-                <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-dim">
-                  Confidence
-                </p>
-                <div className="mt-1 flex items-center gap-2">
-                  <Badge tone={confidenceTone(confidence)}>
-                    {confidencePercent}%
-                  </Badge>
-                </div>
-              </div>
-            </div>
-
-            {/* Confidence bar */}
-            <div className="mt-3">
-              <div className="h-1.5 overflow-hidden rounded-full bg-surface">
-                <div
-                  className={`h-full rounded-full transition-all duration-700 ${
-                    confidence >= 0.85
-                      ? "bg-gradient-to-r from-emerald to-emerald-glow"
-                      : confidence >= 0.6
-                        ? "bg-gradient-to-r from-gold to-gold-glow"
-                        : "bg-gradient-to-r from-rose to-rose-glow"
-                  }`}
-                  style={{ width: `${confidencePercent}%` }}
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Right: Actions */}
-        <div className="w-full shrink-0 space-y-4 md:w-[260px]">
-          {!readyForApproval ? (
-            <div className="rounded-xl border border-white/[0.06] bg-surface-200/60 p-4">
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-dim">
-                  Processing status
-                </p>
-                <Badge tone={document.processing_status === "failed" ? "danger" : "info"}>
-                  {progressPercent}%
-                </Badge>
-              </div>
-              <p className="mt-2 text-sm text-slate-bright">
-                {document.processing_status === "failed"
-                  ? "Processing failed. Re-upload or retry from the backend."
-                  : "This document is still processing. Approval will appear automatically when extraction finishes."}
-              </p>
-              <p className="mt-2 text-xs uppercase tracking-[0.2em] text-slate-dim">
-                {document.current_stage}
-              </p>
-              <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-surface">
-                <div
-                  className={`h-full rounded-full transition-all duration-700 ${
-                    document.processing_status === "failed"
-                      ? "bg-gradient-to-r from-rose to-rose-glow"
-                      : "bg-gradient-to-r from-accent to-accent-glow"
-                  }`}
-                  style={{ width: `${progressPercent}%` }}
-                />
-              </div>
-            </div>
-          ) : alreadyApproved ? (
-            <div className="rounded-xl border border-emerald/20 bg-emerald/10 p-4">
-              <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-emerald-glow/70">
-                Approved category
-              </p>
-              <p className="mt-2 text-sm font-medium text-emerald-glow">
-                {(document.user_category || document.auto_category || category).replace(/_/g, " ")}
-              </p>
-            </div>
-          ) : isRejected ? (
-            <div className="rounded-xl border border-rose/20 bg-rose/10 p-4">
-              <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-rose-glow/70">
-                Rejected
-              </p>
-              <p className="mt-2 text-sm text-rose-glow/80">
-                This document was rejected and will be excluded from analysis.
-              </p>
-            </div>
-          ) : (
-            <>
-              <Select
-                label="Assign category"
-                value={category}
-                onChange={(event) => setCategory(event.target.value)}
+            <div className="flex gap-3">
+              <button
+                type="button"
+                disabled={busy !== null}
+                onClick={async () => {
+                  try {
+                    setBusy("approve");
+                    await onApprove(category);
+                  } finally {
+                    setBusy(null);
+                  }
+                }}
+                className="flex-1 rounded-lg bg-emerald-600 px-4 py-2 font-medium text-white transition-colors hover:bg-emerald-700 disabled:opacity-50"
               >
-                {DOCUMENT_CATEGORIES.map((option) => (
-                  <option key={option} value={option}>
-                    {option.replace(/_/g, " ")}
-                  </option>
-                ))}
-              </Select>
-              <div className="flex gap-2">
-                <Button
-                  className="flex-1"
-                  disabled={approving || rejecting}
-                  onClick={async () => {
-                    try {
-                      setApproving(true);
-                      await onApprove(category);
-                    } finally {
-                      setApproving(false);
-                    }
-                  }}
-                >
-                  {approving ? "Saving..." : "Approve"}
-                </Button>
-                <Button
-                  variant="danger"
-                  className="flex-1"
-                  disabled={approving || rejecting}
-                  onClick={async () => {
-                    try {
-                      setRejecting(true);
-                      await onReject();
-                    } finally {
-                      setRejecting(false);
-                    }
-                  }}
-                >
-                  {rejecting ? "Rejecting..." : "Reject"}
-                </Button>
-              </div>
-            </>
-          )}
-        </div>
+                {busy === "approve" ? "Saving..." : "Approve"}
+              </button>
+              <button
+                type="button"
+                disabled={busy !== null}
+                onClick={async () => {
+                  try {
+                    setBusy("reject");
+                    await onReject();
+                  } finally {
+                    setBusy(null);
+                  }
+                }}
+                className="flex-1 rounded-lg bg-red-600 px-4 py-2 font-medium text-white transition-colors hover:bg-red-700 disabled:opacity-50"
+              >
+                {busy === "reject" ? "Rejecting..." : "Reject"}
+              </button>
+            </div>
+          </div>
+        ) : null}
       </div>
-    </Card>
+    </div>
   );
 }

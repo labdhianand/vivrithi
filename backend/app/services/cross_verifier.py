@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+from datetime import date
 import logging
+import re
 from collections import defaultdict
 from decimal import Decimal
 
+from ..models.case import Case
 from ..models.document import Document
 from ..models.extraction import Extraction
 from ..models.research import ResearchItem
@@ -27,7 +30,86 @@ def _pick(extractions: list[Extraction], category: str, key: str) -> Extraction 
     return None
 
 
-def cross_verify(case_id: str, documents: list[Document], extractions: list[Extraction]) -> list[dict]:
+def _pick_first(extractions: list[Extraction], categories: tuple[str, ...], keys: tuple[str, ...]) -> Extraction | None:
+    for category in categories:
+        for key in keys:
+            extraction = _pick(extractions, category, key)
+            if extraction is not None:
+                return extraction
+    return None
+
+
+def _case_id(case_or_case_id: Case | str) -> str:
+    return case_or_case_id.id if isinstance(case_or_case_id, Case) else str(case_or_case_id)
+
+
+def _case_cin(case_or_case_id: Case | str) -> str:
+    return case_or_case_id.cin if isinstance(case_or_case_id, Case) and case_or_case_id.cin else ""
+
+
+def _cin_year(cin: str) -> int | None:
+    for start in (7, 8):
+        segment = cin[start : start + 4]
+        if len(segment) == 4 and segment.isdigit():
+            return int(segment)
+    match = re.search(r"[A-Z]{2}(\d{4})[A-Z]", cin)
+    if match:
+        return int(match.group(1))
+    return None
+
+
+def _append_risk_flag(
+    checks: list[dict],
+    *,
+    case_id: str,
+    check_name: str,
+    note: str,
+    doc_a: str,
+    doc_b: str | None = None,
+    value_a: str | None = None,
+    value_b: str | None = None,
+    discrepancy: Decimal | None = None,
+) -> None:
+    checks.append(
+        {
+            "case_id": case_id,
+            "check_name": check_name,
+            "doc_a": doc_a,
+            "doc_b": doc_b,
+            "value_a": value_a,
+            "value_b": value_b,
+            "discrepancy": discrepancy if discrepancy is not None else Decimal("0"),
+            "status": "mismatch",
+            "note": note,
+        }
+    )
+
+
+def _gst_return_turnover(extractions: list[Extraction], return_type_term: str) -> Extraction | None:
+    grouped: dict[str, dict[str, Extraction]] = defaultdict(dict)
+    for extraction in extractions:
+        document = getattr(extraction, "document", None)
+        if document is None or document.user_category != "GST_Returns":
+            continue
+        grouped[extraction.document_id][extraction.schema_field_key] = extraction
+
+    normalized_term = return_type_term.lower().replace("-", "").replace(" ", "")
+    for fields in grouped.values():
+        return_type = _active_value(fields.get("return_type")) or ""
+        normalized_type = return_type.lower().replace("-", "").replace(" ", "")
+        if normalized_term in normalized_type:
+            turnover = fields.get("turnover_reported")
+            if turnover and _active_numeric(turnover) is not None:
+                return turnover
+
+    direct_key = _pick_first(extractions, ("GST_Returns",), (f"{normalized_term}_turnover",))
+    if direct_key and _active_numeric(direct_key) is not None:
+        return direct_key
+    return None
+
+
+def cross_verify(case_or_case_id: Case | str, documents: list[Document], extractions: list[Extraction]) -> list[dict]:
+    case_id = _case_id(case_or_case_id)
     grouped_by_doc = defaultdict(list)
     for extraction in extractions:
         grouped_by_doc[extraction.document_id].append(extraction)
@@ -190,8 +272,101 @@ def cross_verify(case_id: str, documents: list[Document], extractions: list[Extr
                 "discrepancy": diff,
                 "status": "match" if diff < Decimal("0.5") else "mismatch",
                 "note": f"Debt-equity ratio diverges by {diff:.2f}x between sources.",
-            }
-        )
+                }
+            )
+
+    gstr_3b = _gst_return_turnover(extractions, "gstr3b")
+    gstr_2a = _gst_return_turnover(extractions, "gstr2a")
+    if gstr_3b and gstr_2a and _active_numeric(gstr_2a) not in {None, Decimal("0")}:
+        discrepancy_ratio = abs(_active_numeric(gstr_3b) - _active_numeric(gstr_2a)) / _active_numeric(gstr_2a)
+        if discrepancy_ratio > Decimal("0.15"):
+            discrepancy_pct = (discrepancy_ratio * Decimal("100")).quantize(Decimal("0.1"))
+            severity = "HIGH" if discrepancy_ratio > Decimal("0.30") else "MEDIUM"
+            _append_risk_flag(
+                checks,
+                case_id=case_id,
+                check_name=f"GSTR-3B vs 2A Reconciliation ({severity})",
+                doc_a="GSTR-3B",
+                doc_b="GSTR-2A",
+                value_a=_active_value(gstr_3b),
+                value_b=_active_value(gstr_2a),
+                discrepancy=discrepancy_pct,
+                note=(
+                    f"GSTR-3B vs 2A discrepancy of {discrepancy_pct}% detected — "
+                    "possible revenue inflation or ITC mismatch risk"
+                ),
+            )
+
+    cin = _case_cin(case_or_case_id).upper()
+    incorporation_year = _cin_year(cin)
+    if incorporation_year is not None:
+        company_age = date.today().year - incorporation_year
+        if company_age < 3:
+            _append_risk_flag(
+                checks,
+                case_id=case_id,
+                check_name="CIN Company Age (MEDIUM)",
+                doc_a="Case Details",
+                value_a=cin,
+                discrepancy=Decimal(str(company_age)),
+                note=f"Company incorporated {company_age} year(s) ago — limited financial track record",
+            )
+
+    pledge_extraction = _pick_first(
+        extractions,
+        ("Shareholding_Pattern", "Annual_Report"),
+        ("shares_pledged_percent", "promoter_pledge_percent"),
+    )
+    if pledge_extraction and _active_numeric(pledge_extraction) is not None:
+        pledge_pct = _active_numeric(pledge_extraction)
+        if pledge_pct > Decimal("75"):
+            _append_risk_flag(
+                checks,
+                case_id=case_id,
+                check_name="Promoter Pledge Threshold (HIGH)",
+                doc_a="Shareholding Pattern",
+                value_a=_active_value(pledge_extraction),
+                discrepancy=pledge_pct,
+                note=f"CRITICAL: Promoter pledge at {pledge_pct}% — very high default risk indicator",
+            )
+        elif pledge_pct > Decimal("50"):
+            _append_risk_flag(
+                checks,
+                case_id=case_id,
+                check_name="Promoter Pledge Threshold (MEDIUM)",
+                doc_a="Shareholding Pattern",
+                value_a=_active_value(pledge_extraction),
+                discrepancy=pledge_pct,
+                note=f"Promoter pledge at {pledge_pct}% — financial stress signal",
+            )
+
+    gnpa_extraction = _pick_first(
+        extractions,
+        ("Portfolio_Performance", "Annual_Report"),
+        ("gnpa_percent", "gross_npa_percent"),
+    )
+    if gnpa_extraction and _active_numeric(gnpa_extraction) is not None:
+        gross_npa_pct = _active_numeric(gnpa_extraction)
+        if gross_npa_pct > Decimal("10"):
+            _append_risk_flag(
+                checks,
+                case_id=case_id,
+                check_name="Gross NPA Threshold (HIGH)",
+                doc_a="Portfolio Performance",
+                value_a=_active_value(gnpa_extraction),
+                discrepancy=gross_npa_pct,
+                note=f"Gross NPA at {gross_npa_pct}% — major credit quality concern",
+            )
+        elif gross_npa_pct > Decimal("5"):
+            _append_risk_flag(
+                checks,
+                case_id=case_id,
+                check_name="Gross NPA Threshold (MEDIUM)",
+                doc_a="Portfolio Performance",
+                value_a=_active_value(gnpa_extraction),
+                discrepancy=gross_npa_pct,
+                note=f"Gross NPA at {gross_npa_pct}% — elevated NPA warrants further scrutiny",
+            )
 
     # 9. GST/Revenue Circular Trading Check (heuristic)
     total_income = _pick(extractions, "Portfolio_Performance", "total_income")

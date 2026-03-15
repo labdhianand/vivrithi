@@ -33,12 +33,24 @@ PROCESS_BACKENDS = {
     "classic",
     "fast",
     "fast_runtime",
+    "marker",
+    "marker_api",
+    "marker_remote",
     "docling",
     "docling_remote",
     "docling_gpu",
     "docling_gpu_remote",
 }
-ARTIFACT_BACKENDS = {"fast_runtime", "docling", "docling_remote", "docling_gpu", "docling_gpu_remote"}
+ARTIFACT_BACKENDS = {
+    "fast_runtime",
+    "marker",
+    "marker_api",
+    "marker_remote",
+    "docling",
+    "docling_remote",
+    "docling_gpu",
+    "docling_gpu_remote",
+}
 SUPPORTED_UPLOAD_EXTENSIONS = {
     ".pdf",
     ".xlsx",
@@ -56,14 +68,22 @@ def _normalize_process_backend(backend: str | None) -> str:
     selected = (backend or get_settings().document_processing_backend).strip().lower()
     if selected not in PROCESS_BACKENDS:
         raise HTTPException(status_code=400, detail=f"Unsupported backend: {selected}")
-    return "fast_runtime" if selected == "fast" else selected
+    if selected == "fast":
+        return "fast_runtime"
+    if selected in {"marker", "marker_api"}:
+        return "marker_remote"
+    if selected in {"docling", "docling_remote", "docling_gpu", "docling_gpu_remote"}:
+        return "marker_remote"
+    return selected
 
 
 def _normalize_artifact_backend(backend: str | None) -> str:
     selected = (backend or get_settings().document_processing_backend).strip().lower()
     if selected == "fast":
         selected = "fast_runtime"
-    if selected in {"docling_gpu", "docling_gpu_remote"}:
+    if selected in {"marker", "marker_api"}:
+        selected = "marker_remote"
+    if selected in {"docling_gpu", "docling_gpu_remote", "docling_remote"}:
         selected = "docling_remote"
     if selected not in ARTIFACT_BACKENDS:
         raise HTTPException(status_code=400, detail=f"Unsupported artifact backend: {selected}")
@@ -75,7 +95,7 @@ async def _build_document_artifact(document: Document, backend: str) -> Document
     category = document.user_category or document.auto_category
     if backend == "docling":
         return build_docling_artifact(source_path)
-    if backend == "docling_remote":
+    if backend in {"docling_remote", "marker_remote"}:
         return await build_docling_remote_artifact(source_path)
     return await build_fast_artifact(
         source_path,

@@ -2,10 +2,18 @@
 
 import { useEffect, useState } from "react";
 
-import { getDefaultSchema, listDocuments, listExtractions, listSchemas, saveSchema, updateSchema } from "@/lib/api";
+import {
+  getDefaultSchema,
+  listDocuments,
+  listExtractions,
+  listSchemas,
+  rerunExtraction,
+  saveSchema,
+  updateExtraction,
+  updateSchema,
+} from "@/lib/api";
 import type { DocumentRecord, ExtractionRecord, SchemaField, SchemaRecord } from "@/lib/types";
 import { SchemaEditor } from "@/components/schema/schema-editor";
-import { Badge } from "@/components/ui/badge";
 
 export default function SchemaPage({ params }: { params: { caseId: string } }) {
   const [schemas, setSchemas] = useState<SchemaRecord[]>([]);
@@ -13,7 +21,7 @@ export default function SchemaPage({ params }: { params: { caseId: string } }) {
     Record<string, { document: DocumentRecord; extractionMap: Record<string, ExtractionRecord> }>
   >({});
 
-  const refresh = async () => {
+  async function refresh() {
     const [documents, existingSchemas] = await Promise.all([listDocuments(params.caseId), listSchemas(params.caseId)]);
     const known = new Map(existingSchemas.map((item) => [item.document_category, item]));
     const categories = Array.from(
@@ -24,7 +32,7 @@ export default function SchemaPage({ params }: { params: { caseId: string } }) {
       ),
     );
 
-    const missing = [];
+    const missing: SchemaRecord[] = [];
     for (const category of categories) {
       if (!known.has(category)) {
         const fallback = await getDefaultSchema(category);
@@ -37,9 +45,10 @@ export default function SchemaPage({ params }: { params: { caseId: string } }) {
           is_default: fallback.is_default,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
-        } satisfies SchemaRecord);
+        });
       }
     }
+
     setSchemas([...existingSchemas, ...missing]);
 
     const latestDocsByCategory = new Map<string, DocumentRecord>();
@@ -49,13 +58,7 @@ export default function SchemaPage({ params }: { params: { caseId: string } }) {
         continue;
       }
       const current = latestDocsByCategory.get(category);
-      if (!current) {
-        latestDocsByCategory.set(category, document);
-        continue;
-      }
-      const currentApproved = current.classification_status === "user_approved";
-      const nextApproved = document.classification_status === "user_approved";
-      if ((nextApproved && !currentApproved) || new Date(document.updated_at) > new Date(current.updated_at)) {
+      if (!current || new Date(document.updated_at) > new Date(current.updated_at)) {
         latestDocsByCategory.set(category, document);
       }
     }
@@ -72,86 +75,63 @@ export default function SchemaPage({ params }: { params: { caseId: string } }) {
         ] as const;
       }),
     );
+
     setSchemaPreviews(Object.fromEntries(previewEntries));
-  };
+  }
 
   useEffect(() => {
     refresh();
   }, [params.caseId]);
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-dim">
-            Configuration
-          </p>
-          <h2 className="mt-1 text-lg font-semibold text-slate-bright">
-            Extraction Schemas
-          </h2>
-          <p className="mt-2 max-w-3xl text-sm text-slate-dim">
-            Tune required fields and output structure category by category. Use the quick jump to move between schemas
-            and the in-card filters to narrow large field lists.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge tone="neutral">{schemas.length} schemas</Badge>
-          <Badge tone="info">
-            {schemas.reduce((count, schema) => count + (schema.fields as SchemaField[]).filter((field) => field.required).length, 0)} required
-            fields
-          </Badge>
-        </div>
+    <div className="mx-auto max-w-5xl px-4 py-8">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-slate-900">Schema Configuration</h1>
+        <p className="mt-1 text-slate-500">Review default fields, refine the extraction schema, rerun parsing, and edit extracted values inline.</p>
       </div>
 
-      {schemas.length > 0 && (
-        <div className="rounded-2xl border border-white/[0.06] bg-surface-200/30 p-4">
-          <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-dim">Quick Jump</p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {schemas.map((schema) => (
-              <a
-                key={`jump-${schema.document_category}-${schema.id}`}
-                href={`#schema-${schema.document_category}`}
-                className="inline-flex rounded-xl border border-white/[0.08] bg-surface-100/60 px-3 py-2 text-sm text-slate transition-all duration-200 hover:border-white/[0.14] hover:bg-surface-100 hover:text-slate-bright"
-              >
-                {schema.document_category}
-              </a>
-            ))}
-          </div>
-        </div>
-      )}
-
       <div className="space-y-6">
-        {schemas.map((schema) => (
-          <SchemaEditor
-            key={`${schema.document_category}-${schema.id}`}
-            category={schema.document_category}
-            initialFields={schema.fields as SchemaField[]}
-            extractionPreview={schemaPreviews[schema.document_category]?.extractionMap}
-            previewDocumentName={schemaPreviews[schema.document_category]?.document.original_filename ?? null}
-            onSave={async (fields) => {
-              const payload = {
-                document_category: schema.document_category,
-                fields,
-                schema_version: schema.schema_version + 1,
-                is_default: false,
-              };
-              if (schema.id.length === 36) {
-                await updateSchema(params.caseId, schema.id, payload);
-              } else {
-                await saveSchema(params.caseId, payload);
-              }
-              await refresh();
-            }}
-          />
-        ))}
+        {schemas.map((schema) => {
+          const preview = schemaPreviews[schema.document_category];
+          return (
+            <SchemaEditor
+              key={`${schema.document_category}-${schema.id}`}
+              category={schema.document_category}
+              initialFields={schema.fields as SchemaField[]}
+              extractionPreview={preview?.extractionMap}
+              previewDocumentName={preview?.document.original_filename ?? null}
+              previewDocumentId={preview?.document.id ?? null}
+              onRunExtraction={preview?.document ? async () => {
+                await rerunExtraction(preview.document.id);
+                await refresh();
+              } : undefined}
+              onUpdateExtraction={async (extractionId, value) => {
+                await updateExtraction(extractionId, { user_edited_value: value, user_verified: true });
+                await refresh();
+              }}
+              onSave={async (fields) => {
+                const payload = {
+                  document_category: schema.document_category,
+                  fields,
+                  schema_version: schema.schema_version + 1,
+                  is_default: false,
+                };
+                if (schema.id.length === 36) {
+                  await updateSchema(params.caseId, schema.id, payload);
+                } else {
+                  await saveSchema(params.caseId, payload);
+                }
+                await refresh();
+              }}
+            />
+          );
+        })}
 
-        {schemas.length === 0 && (
-          <div className="panel p-10 text-center">
-            <p className="text-sm text-slate-dim">
-              Upload documents to generate extraction schemas.
-            </p>
+        {schemas.length === 0 ? (
+          <div className="rounded-xl border border-slate-200 bg-white p-8 text-center text-slate-500 shadow-sm">
+            Upload and classify documents to generate editable schemas.
           </div>
-        )}
+        ) : null}
       </div>
     </div>
   );

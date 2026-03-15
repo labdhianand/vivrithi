@@ -58,7 +58,7 @@ async def run_case_analysis(session: AsyncSession, case: Case, notes: list) -> S
         await session.commit()
         research_items = await _get_research(session, case.id)
 
-    cross_checks = cross_verify(case.id, documents, extractions)
+    cross_checks = cross_verify(case, documents, extractions)
     # LLM triangulation: additive checks, never removes existing ones
     try:
         llm_checks = llm_triangulate(case.id, extractions, research_items)

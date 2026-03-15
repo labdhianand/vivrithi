@@ -8,7 +8,7 @@ export function formatCurrency(value: number | string | null | undefined, unit =
   if (value === null || value === undefined || value === "") {
     return "N/A";
   }
-  return `₹${value} ${unit}`;
+  return `Rs. ${value} ${unit}`;
 }
 
 export function formatPercent(value: number | string | null | undefined) {
@@ -32,7 +32,4 @@ export const DOCUMENT_CATEGORIES = [
   "Borrowing_Profile",
   "Annual_Report",
   "Portfolio_Performance",
-  "GST_Returns",
-  "Bank_Statement",
-  "ITR",
 ] as const;

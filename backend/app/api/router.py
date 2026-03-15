@@ -4,7 +4,6 @@ from fastapi import APIRouter
 
 from .analysis import router as analysis_router
 from .cases import router as cases_router
-from .databricks import router as databricks_router
 from .documents import router as documents_router
 from .extraction import router as extraction_router
 from .notes import router as notes_router
@@ -23,5 +22,4 @@ router.include_router(research_router, tags=["research"])
 router.include_router(notes_router, tags=["notes"])
 router.include_router(analysis_router, tags=["analysis"])
 router.include_router(reports_router, tags=["reports"])
-router.include_router(databricks_router, tags=["integrations"])
 router.include_router(ops_router, tags=["ops"])

@@ -8,7 +8,7 @@ type CardProps = PropsWithChildren<HTMLAttributes<HTMLDivElement>> & {
 
 export function Card({ className, glow, children, ...props }: CardProps) {
   return (
-    <div className={cn(glow ? "panel-glow" : "panel", "p-5", className)} {...props}>
+    <div className={cn(glow ? "panel-glow" : "panel", "p-5 md:p-6", className)} {...props}>
       {children}
     </div>
   );

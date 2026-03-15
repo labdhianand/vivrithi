@@ -5,10 +5,7 @@ from pathlib import Path
 from time import perf_counter
 from typing import Any
 
-try:
-    from docling.document_converter import DocumentConverter
-except ImportError:  # pragma: no cover - optional dependency
-    DocumentConverter = None
+from .docling_remote import build_marker_payload_sync, convert_pdf_to_markdown_sync
 
 
 @dataclass(slots=True)
@@ -21,20 +18,16 @@ class DoclingResult:
 
 
 class DoclingBackend:
-    def __init__(self) -> None:
-        if DocumentConverter is None:
-            raise RuntimeError("docling is not installed")
-        self.converter = DocumentConverter()
-
     def convert(self, pdf_path: Path) -> DoclingResult:
         started = perf_counter()
-        result = self.converter.convert(pdf_path)
+        conversion = convert_pdf_to_markdown_sync(str(pdf_path))
+        payload = build_marker_payload_sync(str(pdf_path), conversion)
         elapsed = perf_counter() - started
-        document = result.document
+        payload["convert_seconds"] = round(elapsed, 6)
         return DoclingResult(
-            markdown=document.export_to_markdown(),
-            text=document.export_to_text(),
-            page_count=len(document.pages),
+            markdown=payload.get("markdown", ""),
+            text=payload.get("text", ""),
+            page_count=int(payload.get("page_count") or 0),
             convert_seconds=elapsed,
-            document=document,
+            document=payload,
         )

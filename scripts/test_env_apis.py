@@ -3,16 +3,14 @@
 
 The script focuses on the services documented in `reference/v1/api.md`:
 - Qdrant
-- Tavily
 - Firecrawl
 - LandingAI
 - Sarvam
 - OpenRouter
-- Databricks
 
 Usage:
     python3 scripts/test_env_apis.py
-    python3 scripts/test_env_apis.py --only tavily,openrouter
+    python3 scripts/test_env_apis.py --only firecrawl,openrouter
     python3 scripts/test_env_apis.py --json
 """
 
@@ -38,7 +36,6 @@ DEFAULT_TIMEOUT_SECONDS = 60.0
 DEFAULT_OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 DEFAULT_LANDINGAI_ENDPOINT = "https://api.va.landing.ai/v1"
 DEFAULT_SARVAM_BASE_URL = "https://api.sarvam.ai"
-DEFAULT_TAVILY_SEARCH_URL = "https://api.tavily.com/search"
 DEFAULT_FIRECRAWL_SCRAPE_URL = "https://api.firecrawl.dev/v2/scrape"
 
 
@@ -363,39 +360,6 @@ def check_qdrant(env: dict[str, str], timeout: float, _: str) -> Result:
     )
 
 
-def check_tavily(env: dict[str, str], timeout: float, _: str) -> Result:
-    status, missing = config_state(env, required=["TAVILY_API_KEY"])
-    if status == "skip":
-        return make_skip("tavily", "TAVILY_API_KEY is not set")
-    if status == "config":
-        return make_config("tavily", missing)
-
-    response = request_http(
-        "POST",
-        DEFAULT_TAVILY_SEARCH_URL,
-        headers={"Authorization": f"Bearer {env_value(env, 'TAVILY_API_KEY')}"},
-        json_body={"query": "OpenAI", "max_results": 1, "topic": "general"},
-        timeout=timeout,
-    )
-    payload = require_dict(response, "Tavily")
-    results = payload.get("results")
-    if not isinstance(results, list):
-        raise SmokeTestError(
-            "Tavily response did not include a results list",
-            http_status=response.status_code,
-            detail=truncate(response.text),
-            elapsed_ms=response.elapsed_ms,
-        )
-
-    return Result(
-        service="tavily",
-        status="PASS",
-        summary=f"search succeeded; received {len(results)} result(s)",
-        http_status=response.status_code,
-        elapsed_ms=response.elapsed_ms,
-    )
-
-
 def check_firecrawl(env: dict[str, str], timeout: float, _: str) -> Result:
     status, missing = config_state(env, required=["FIRECRAWL_API_KEY"])
     if status == "skip":
@@ -580,63 +544,12 @@ def check_openrouter(env: dict[str, str], timeout: float, _: str) -> Result:
     )
 
 
-def check_databricks(env: dict[str, str], timeout: float, _: str) -> Result:
-    status, missing = config_state(
-        env,
-        required=["DATABRICKS_HOST", "DATABRICKS_TOKEN"],
-        optional=["DATABRICKS_WAREHOUSE_ID"],
-    )
-    if status == "skip":
-        return make_skip("databricks", "DATABRICKS_HOST and DATABRICKS_TOKEN are not set")
-    if status == "config":
-        return make_config("databricks", missing)
-
-    response = request_http(
-        "GET",
-        join_url(env_value(env, "DATABRICKS_HOST"), "api", "2.0", "sql", "warehouses"),
-        headers={"Authorization": f"Bearer {env_value(env, 'DATABRICKS_TOKEN')}"},
-        timeout=timeout,
-    )
-    payload = require_dict(response, "Databricks")
-    warehouses = payload.get("warehouses")
-    if not isinstance(warehouses, list):
-        raise SmokeTestError(
-            "Databricks response did not include a warehouses list",
-            http_status=response.status_code,
-            detail=truncate(response.text),
-            elapsed_ms=response.elapsed_ms,
-        )
-
-    warehouse_id = env_value(env, "DATABRICKS_WAREHOUSE_ID")
-    if warehouse_id:
-        warehouse_ids = {item.get("id") for item in warehouses if isinstance(item, dict)}
-        if warehouse_id not in warehouse_ids:
-            raise SmokeTestError(
-                f"Configured Databricks warehouse '{warehouse_id}' was not returned by the API",
-                http_status=response.status_code,
-                elapsed_ms=response.elapsed_ms,
-            )
-        summary = f"warehouse list succeeded; configured warehouse '{warehouse_id}' is visible"
-    else:
-        summary = f"warehouse list succeeded; received {len(warehouses)} warehouse entries"
-
-    return Result(
-        service="databricks",
-        status="PASS",
-        summary=summary,
-        http_status=response.status_code,
-        elapsed_ms=response.elapsed_ms,
-    )
-
-
 CHECKS: dict[str, Callable[[dict[str, str], float, str], Result]] = {
     "qdrant": check_qdrant,
-    "tavily": check_tavily,
     "firecrawl": check_firecrawl,
     "landingai": check_landingai,
     "sarvam": check_sarvam,
     "openrouter": check_openrouter,
-    "databricks": check_databricks,
 }
 
 
