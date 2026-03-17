@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: intelli-credit-api
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -e .
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: FIRECRAWL_API_KEY
+        sync: false
+      - key: MARKER_API_URL
+        sync: false
+      - key: DATABASE_URL
+        value: sqlite:///./intelli_credit.db
+      - key: PYTHON_VERSION
+        value: 3.11.0

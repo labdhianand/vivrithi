@@ -48,3 +48,7 @@ frontend/.env.local:
 ```text
 NEXT_PUBLIC_API_URL=http://localhost:8000
 ```
+
+WARNING: Render free tier resets SQLite on redeploy.
+For persistent data use Render's persistent disk
+or migrate to PostgreSQL.

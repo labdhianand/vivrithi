@@ -99,6 +99,9 @@ app.add_middleware(APIKeyMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins or ["*"],
+    allow_origin_regex=(
+        None if settings.cors_origins == ["*"] else r"https://.*\.vercel\.app"
+    ),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -108,5 +111,5 @@ app.mount("/storage", StaticFiles(directory=settings.storage_root), name="storag
 
 
 @app.get("/health")
-async def health() -> dict:
-    return {"status": "ok"}
+def health_check() -> dict:
+    return {"status": "ok", "service": "intelli-credit-api"}
