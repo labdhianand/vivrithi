@@ -80,23 +80,33 @@ export async function getDocument(documentId: string) {
   return request<DocumentRecord>(`/api/documents/${documentId}`);
 }
 
-export async function approveClassification(documentId: string, category: string) {
+export async function deleteDocument(documentId: string) {
+  return request<void>(`/api/documents/${documentId}`, {
+    method: "DELETE",
+  });
+}
+
+export async function updateDocumentClassification(
+  documentId: string,
+  payload: { user_category: string; classification_status: string },
+) {
   return request<DocumentRecord>(`/api/documents/${documentId}/classify`, {
     method: "PATCH",
-    body: JSON.stringify({
-      user_category: category,
-      classification_status: "user_approved",
-    }),
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function approveClassification(documentId: string, category: string) {
+  return updateDocumentClassification(documentId, {
+    user_category: category,
+    classification_status: "user_approved",
   });
 }
 
 export async function rejectClassification(documentId: string) {
-  return request<DocumentRecord>(`/api/documents/${documentId}/classify`, {
-    method: "PATCH",
-    body: JSON.stringify({
-      user_category: "",
-      classification_status: "rejected",
-    }),
+  return updateDocumentClassification(documentId, {
+    user_category: "",
+    classification_status: "rejected",
   });
 }
 

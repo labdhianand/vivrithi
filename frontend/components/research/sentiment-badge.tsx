@@ -40,7 +40,7 @@ export function SentimentBadge({ value }: { value?: string | null }) {
     );
   }
   return (
-    <Badge tone="neutral">
+    <Badge tone="neutral" className="border-[#7a2550] bg-[#3d1a2a] text-[#f48fb1]">
       <span className="flex items-center gap-1">
         {icons.neutral}
         Neutral

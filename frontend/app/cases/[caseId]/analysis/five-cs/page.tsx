@@ -11,60 +11,15 @@ import { ScoreCard } from "@/components/analysis/score-card";
 import { SwotGrid } from "@/components/analysis/swot-grid";
 import { Badge } from "@/components/ui/badge";
 
-const cMeta: Record<string, { color: string; icon: React.ReactNode }> = {
-  Character: {
-    color: "text-accent-glow",
-    icon: (
-      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
-      </svg>
-    ),
-  },
-  Capacity: {
-    color: "text-emerald-glow",
-    icon: (
-      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18 9 11.25l4.306 4.306a11.95 11.95 0 0 1 5.814-5.518l2.74-1.22m0 0-5.94-2.281m5.94 2.28-2.28 5.941" />
-      </svg>
-    ),
-  },
-  Capital: {
-    color: "text-gold-glow",
-    icon: (
-      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-      </svg>
-    ),
-  },
-  Collateral: {
-    color: "text-rose-glow",
-    icon: (
-      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z" />
-      </svg>
-    ),
-  },
-  Conditions: {
-    color: "text-blue-400",
-    icon: (
-      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M12 21a9.004 9.004 0 0 0 8.716-6.747M12 21a9.004 9.004 0 0 1-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 0 1 7.843 4.582M12 3a8.997 8.997 0 0 0-7.843 4.582m15.686 0A11.953 11.953 0 0 1 12 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0 1 21 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0 1 12 16.5a17.92 17.92 0 0 1-8.716-2.247m0 0A9 9 0 0 1 3 12c0-1.47.353-2.856.978-4.082" />
-      </svg>
-    ),
-  },
-};
-
 function gradeColor(score: number): string {
-  if (score >= 80) return "text-emerald-glow";
-  if (score >= 60) return "text-gold-glow";
-  if (score >= 40) return "text-accent-glow";
-  return "text-rose-glow";
+  if (score > 70) return "text-green-300";
+  if (score >= 50) return "text-amber-300";
+  return "text-red-300";
 }
 
 function gradeTone(score: number): "success" | "warn" | "info" | "danger" {
-  if (score >= 80) return "success";
-  if (score >= 60) return "warn";
-  if (score >= 40) return "info";
+  if (score > 70) return "success";
+  if (score >= 50) return "warn";
   return "danger";
 }
 
@@ -130,7 +85,6 @@ export default function FiveCsPage({ params }: { params: { caseId: string } }) {
       {/* Score cards grid */}
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {cEntries.map((entry, i) => {
-          const meta = cMeta[entry.label];
           return (
             <div key={entry.label} className={`animate-slide-up stagger-${Math.min(i + 2, 6)}`}>
               <ScoreCard label={entry.label} score={entry.score} caseId={params.caseId} />
@@ -159,24 +113,24 @@ export default function FiveCsPage({ params }: { params: { caseId: string } }) {
             <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-dim">Model Transparency</p>
             <h3 className="mt-2 text-base font-semibold text-slate-bright">ML Risk Model Info</h3>
             <div className="mt-4 grid gap-3 md:grid-cols-3">
-              <div className="rounded-xl border border-white/[0.06] bg-surface-200/60 p-3">
+              <div className="rounded-xl border border-[#4a1530] bg-[#2d1420] p-3">
                 <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-dim">Training AUC</p>
                 <p className="mt-1 text-lg font-semibold text-accent-glow">
                   {((recommendation as any).ml_prediction.model_metadata.training_auc * 100).toFixed(1)}%
                 </p>
               </div>
-              <div className="rounded-xl border border-white/[0.06] bg-surface-200/60 p-3">
+              <div className="rounded-xl border border-[#4a1530] bg-[#2d1420] p-3">
                 <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-dim">Model Type</p>
                 <p className="mt-1 text-sm text-slate-bright">{(recommendation as any).ml_prediction.model_metadata.model_type}</p>
               </div>
-              <div className="rounded-xl border border-white/[0.06] bg-surface-200/60 p-3">
+              <div className="rounded-xl border border-[#4a1530] bg-[#2d1420] p-3">
                 <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-dim">Training Samples</p>
                 <p className="mt-1 text-sm text-slate-bright">{(recommendation as any).ml_prediction.model_metadata.training_samples}</p>
               </div>
             </div>
             {(recommendation as any).ml_prediction.model_metadata.top_features && (
               <div className="mt-4">
-                <p className="text-xs font-medium text-slate-dim mb-2">Top Feature Importances</p>
+                <p className="mb-2 text-xs font-medium text-slate-dim">Top Feature Importances</p>
                 <div className="space-y-1.5">
                   {(recommendation as any).ml_prediction.model_metadata.top_features.slice(0, 5).map((f: any) => (
                     <div key={f.feature} className="flex items-center gap-3">

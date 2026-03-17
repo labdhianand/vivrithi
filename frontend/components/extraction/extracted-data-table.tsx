@@ -39,26 +39,21 @@ export function ExtractedDataTable({
   };
 
   return (
-    <Card className="overflow-hidden">
-      {/* Header */}
+    <Card className="overflow-hidden border-[#4a1530] bg-[#1f0d16]">
       <div className="mb-5 flex items-center justify-between">
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-dim">
-            Results
-          </p>
+          <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-dim">Results</p>
           <h3 className="mt-1 text-base font-semibold text-slate-bright">Structured Extraction</h3>
         </div>
         <Badge tone="neutral">{extractions.length} fields</Badge>
       </div>
 
-      {/* Table header */}
       <div className="mb-2 grid grid-cols-[1fr_auto] gap-4 px-4">
         <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-dim">Field</p>
         <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-dim">Confidence</p>
       </div>
 
-      {/* Extraction rows */}
-      <div className="space-y-0 divide-y divide-white/[0.06]">
+      <div className="space-y-0 divide-y divide-[#4a1530]">
         {extractions.map((entry, index) => {
           const isActive = activeExtractionId === entry.id;
           const isEdited = entry.user_verified;
@@ -72,9 +67,9 @@ export function ExtractedDataTable({
                 isActive
                   ? "border border-accent/30 bg-accent/[0.06]"
                   : index % 2 === 0
-                    ? "bg-surface-200/40"
+                    ? "bg-[#2d1420]/60"
                     : "bg-transparent",
-                !isActive && "hover:bg-surface-200/70",
+                !isActive && "hover:bg-[#2d1420]",
               )}
               onMouseEnter={() => onHighlight?.(entry.id)}
             >
@@ -86,6 +81,11 @@ export function ExtractedDataTable({
                     </span>
                     {isEdited && <Badge tone="success">Verified</Badge>}
                     {isMissingRequired && <Badge tone="danger">Required Missing</Badge>}
+                    {isMissing && !isMissingRequired && (
+                      <span className="rounded-md bg-amber-950 px-2 py-1 text-[11px] font-medium text-amber-300">
+                        Null value
+                      </span>
+                    )}
                   </div>
                   <p className="mt-0.5 text-[10px] font-bold uppercase tracking-[0.25em] text-slate-dim">
                     {entry.value_type}

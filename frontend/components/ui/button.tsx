@@ -9,15 +9,15 @@ type Props = PropsWithChildren<ButtonHTMLAttributes<HTMLButtonElement>> & {
 
 const variants = {
   primary:
-    "bg-accent text-white font-semibold hover:bg-[#648eff] shadow-glow hover:shadow-[0_22px_46px_rgba(79,124,255,0.28)] active:scale-[0.98]",
+    "rounded-lg bg-accent text-[#fce4ec] font-medium hover:bg-accent-dim shadow-glow active:scale-[0.98]",
   secondary:
-    "border border-white/[0.1] bg-white/[0.04] text-slate-bright hover:border-white/[0.16] hover:bg-white/[0.08]",
+    "rounded-lg border border-[#7a2550] bg-[#3d1a2a] text-[#f48fb1] hover:bg-[#4a1530]",
   ghost:
-    "bg-transparent text-slate hover:text-slate-bright hover:bg-white/[0.06]",
+    "rounded-lg bg-transparent text-slate hover:bg-[#3d1a2a] hover:text-slate-bright",
   danger:
-    "bg-rose-dim text-white hover:bg-rose shadow-glow-rose active:scale-[0.98]",
+    "rounded-lg bg-red-600 text-[#fce4ec] hover:bg-red-700 shadow-glow-rose active:scale-[0.98]",
   gold:
-    "bg-gold-dim text-surface font-semibold hover:bg-gold shadow-glow-gold active:scale-[0.98]",
+    "rounded-lg bg-amber-600 text-[#fce4ec] font-medium hover:bg-amber-500 shadow-glow-gold active:scale-[0.98]",
 };
 
 const sizes = {
@@ -30,7 +30,7 @@ export function Button({ className, variant = "primary", size = "md", children, 
   return (
     <button
       className={cn(
-        "inline-flex items-center justify-center gap-2 rounded-xl font-medium tracking-[0.01em] transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-40",
+        "inline-flex items-center justify-center gap-2 font-medium tracking-[0.01em] transition-colors duration-200 disabled:cursor-not-allowed disabled:opacity-40",
         variants[variant],
         sizes[size],
         className,

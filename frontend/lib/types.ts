@@ -39,6 +39,7 @@ export interface DocumentRecord {
   user_category?: string | null;
   classification_status: string;
   processing_status: string;
+  failure_reason?: string | null;
   current_stage: string;
   progress_percent: number;
   total_pages?: number | null;

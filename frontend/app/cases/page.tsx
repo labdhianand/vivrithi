@@ -32,15 +32,10 @@ export default function CasesPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="animate-slide-up flex items-end justify-between">
         <div>
-          <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-dim">
-            Case Pipeline
-          </div>
-          <h1 className="text-gradient mt-2 font-serif text-3xl">
-            Underwriting Cases
-          </h1>
+          <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-dim">Case Pipeline</div>
+          <h1 className="text-gradient mt-2 font-serif text-3xl">Underwriting Cases</h1>
         </div>
         <Link href="/onboarding">
           <Button size="sm">
@@ -52,22 +47,15 @@ export default function CasesPage() {
         </Link>
       </div>
 
-      {/* Table card */}
-      <Card className="animate-slide-up stagger-2 overflow-hidden p-0">
+      <Card glow className="animate-slide-up stagger-2 overflow-hidden border-[#4a1530] p-0">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead>
-              <tr className="border-b border-white/[0.06]">
-                <th className="px-5 py-3.5 text-[10px] font-bold uppercase tracking-[0.25em] text-slate-dim">
-                  Company
-                </th>
-                <th className="px-5 py-3.5 text-[10px] font-bold uppercase tracking-[0.25em] text-slate-dim">
-                  Sector
-                </th>
-                <th className="px-5 py-3.5 text-[10px] font-bold uppercase tracking-[0.25em] text-slate-dim">
-                  Status
-                </th>
-                <th className="px-5 py-3.5 text-[10px] font-bold uppercase tracking-[0.25em] text-slate-dim text-right">
+              <tr className="border-b border-[#4a1530] bg-[#2d1420]/70">
+                <th className="px-5 py-3.5 text-[10px] font-bold uppercase tracking-[0.25em] text-[#ad6883]">Company</th>
+                <th className="px-5 py-3.5 text-[10px] font-bold uppercase tracking-[0.25em] text-[#ad6883]">Sector</th>
+                <th className="px-5 py-3.5 text-[10px] font-bold uppercase tracking-[0.25em] text-[#ad6883]">Status</th>
+                <th className="px-5 py-3.5 text-right text-[10px] font-bold uppercase tracking-[0.25em] text-[#ad6883]">
                   Loan Amount
                 </th>
               </tr>
@@ -76,7 +64,7 @@ export default function CasesPage() {
               {cases.map((item, idx) => (
                 <tr
                   key={item.id}
-                  className={`animate-fade-in border-b border-white/[0.04] transition-colors duration-150 hover:bg-white/[0.02] stagger-${Math.min(idx + 1, 6)}`}
+                  className={`animate-fade-in border-b border-[#4a1530]/70 transition-colors duration-150 hover:bg-[#3d1a2a]/40 stagger-${Math.min(idx + 1, 6)}`}
                 >
                   <td className="px-5 py-4">
                     <Link
@@ -107,7 +95,6 @@ export default function CasesPage() {
           </table>
         </div>
 
-        {/* Empty / loading states */}
         {loading && (
           <div className="flex items-center justify-center py-16">
             <div className="h-5 w-5 animate-spin rounded-full border-2 border-accent/30 border-t-accent" />
@@ -121,7 +108,7 @@ export default function CasesPage() {
                 <span className="text-rose-glow">{error}</span>
               ) : (
                 <>
-                  <p className="text-base text-slate">No cases yet</p>
+                  <p className="text-base text-slate-bright">No cases yet</p>
                   <p className="mt-1 text-sm text-slate-dim">
                     Create your first underwriting case to get started.
                   </p>

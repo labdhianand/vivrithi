@@ -32,7 +32,7 @@ export function AnalysisSummaryPanels({ summary }: { summary: AnalysisSummary })
             <p className="text-sm text-slate">Required schema coverage looks complete for the latest processed documents.</p>
           ) : (
             summary.missing_required_fields.slice(0, 8).map((field) => (
-              <div key={`${field.document_category}-${field.field_key}`} className="rounded-xl border border-white/[0.06] bg-rose/[0.04] p-3">
+              <div key={`${field.document_category}-${field.field_key}`} className="rounded-xl border border-red-800 bg-red-950/40 p-3">
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge tone="danger">{field.document_category}</Badge>
                   {field.document_name && <Badge tone="neutral">{field.document_name}</Badge>}
@@ -60,7 +60,7 @@ export function AnalysisSummaryPanels({ summary }: { summary: AnalysisSummary })
             <p className="text-sm text-slate">No explicit cross-document mismatches are currently recorded.</p>
           ) : (
             summary.contradictions.slice(0, 6).map((item) => (
-              <div key={item.id} className="rounded-xl border border-white/[0.06] bg-gold/[0.04] p-3">
+              <div key={item.id} className="rounded-xl border border-amber-800 bg-amber-950/40 p-3">
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge tone="warn">{item.check_name}</Badge>
                   {item.doc_a && <Badge tone="neutral">{item.doc_a}</Badge>}
@@ -98,7 +98,7 @@ export function AnalysisSummaryPanels({ summary }: { summary: AnalysisSummary })
             <p className="text-sm text-slate">No borrower-specific verified research findings are currently available.</p>
           ) : (
             summary.research_digest.verified_borrower_items.map((item) => (
-              <div key={item.id} className="rounded-xl border border-white/[0.06] bg-surface-200/60 p-3">
+              <div key={item.id} className="rounded-xl border border-[#4a1530] bg-[#2d1420] p-3">
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge tone={item.severity === "high" ? "danger" : item.severity === "medium" ? "warn" : "default"}>
                     {item.category}
@@ -111,7 +111,7 @@ export function AnalysisSummaryPanels({ summary }: { summary: AnalysisSummary })
                 {parseMatchedTerms(item.matched_terms).length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-2">
                     {parseMatchedTerms(item.matched_terms).map((term) => (
-                      <span key={term} className="rounded-md border border-white/[0.08] bg-surface-300/60 px-2 py-1 text-[11px] text-slate">
+                      <span key={term} className="rounded-md border border-[#4a1530] bg-[#3d1a2a] px-2 py-1 text-[11px] text-slate">
                         {term}
                       </span>
                     ))}
@@ -136,7 +136,7 @@ export function AnalysisSummaryPanels({ summary }: { summary: AnalysisSummary })
             <p className="text-sm text-slate">No analyst observations have been added yet.</p>
           ) : (
             summary.note_impacts.slice(0, 6).map((note) => (
-              <div key={note.id} className="rounded-xl border border-white/[0.06] bg-surface-200/60 p-3">
+              <div key={note.id} className="rounded-xl border border-[#4a1530] bg-[#2d1420] p-3">
                 <div className="flex flex-wrap items-center gap-2">
                   {note.note_type && <Badge tone="neutral">{note.note_type.replace(/_/g, " ")}</Badge>}
                   {note.affected_c && <Badge tone="info">{note.affected_c}</Badge>}

@@ -36,11 +36,10 @@ class Settings(BaseSettings):
     storage_root: Path = ROOT_DIR / "backend" / "storage"
     storage_bucket: str = "intelli-credit-docs"
     max_upload_size_mb: int = 50
-    document_processing_backend: str = "marker_remote"
+    document_processing_backend: str = "docling_remote"
     document_processing_max_workers: int = 8
     document_batch_max_concurrency: int = 4
-
-    marker_api_url: str = "http://127.0.0.1:8001"
+    MARKER_API_URL: str = "http://127.0.0.1:8001"
 
     gemini_api_key: str | None = None
     gemini_text_model: str = "gemini-2.5-flash"

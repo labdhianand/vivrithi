@@ -71,10 +71,9 @@ export function AnalystNoteForm({
 
   return (
     <div className="panel p-5 space-y-5">
-      {/* Form header */}
       <div className="flex items-center gap-3">
-        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gold/15">
-          <svg className="h-4.5 w-4.5 text-gold-glow" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#e91e8c]/15">
+          <svg className="h-4.5 w-4.5 text-[#ff6bb5]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
           </svg>
         </div>
@@ -84,10 +83,8 @@ export function AnalystNoteForm({
         </div>
       </div>
 
-      {/* Divider */}
-      <div className="h-px bg-white/[0.06]" />
+      <div className="h-px bg-[#4a1530]" />
 
-      {/* Fields grid */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Select
           label="Note type"
@@ -129,7 +126,6 @@ export function AnalystNoteForm({
         />
       </div>
 
-      {/* Content area */}
       <Textarea
         label="Observation"
         rows={5}
@@ -139,12 +135,12 @@ export function AnalystNoteForm({
       />
 
       {suggestion && (
-        <div className="rounded-xl border border-white/[0.08] bg-surface-200/60 p-4">
+        <div className="rounded-xl border border-[#4a1530] bg-[#2d1420] p-4">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-dim">Suggested Mapping</span>
             <span className="rounded-md bg-accent/15 px-2 py-1 text-[11px] text-accent-glow">{suggestion.affected_c}</span>
             <span className="rounded-md bg-gold/15 px-2 py-1 text-[11px] text-gold-glow">{suggestion.sentiment}</span>
-            <span className="rounded-md bg-white/[0.06] px-2 py-1 text-[11px] text-slate">
+            <span className="rounded-md bg-[#3d1a2a] px-2 py-1 text-[11px] text-slate">
               {suggestion.risk_adjustment > 0 ? "+" : ""}
               {suggestion.risk_adjustment}
             </span>
@@ -155,7 +151,7 @@ export function AnalystNoteForm({
               {suggestion.signals.map((signal) => (
                 <span
                   key={signal}
-                  className="rounded-md border border-white/[0.08] bg-surface-300/60 px-2 py-1 text-[11px] text-slate"
+                  className="rounded-md border border-[#4a1530] bg-[#3d1a2a] px-2 py-1 text-[11px] text-slate"
                 >
                   {signal}
                 </span>
@@ -165,7 +161,6 @@ export function AnalystNoteForm({
         </div>
       )}
 
-      {/* Submit row */}
       <div className="flex items-center justify-between">
         <p className="text-[11px] text-slate-dim">
           {content.length > 0 ? `${content.length} characters` : "Start typing your observation"}
@@ -174,7 +169,7 @@ export function AnalystNoteForm({
           <Button
             onClick={handleSuggest}
             disabled={!content.trim() || suggesting}
-            variant="ghost"
+            variant="secondary"
           >
             {suggesting ? (
               <>
@@ -191,7 +186,7 @@ export function AnalystNoteForm({
           <Button
             onClick={handleSubmit}
             disabled={!content.trim() || submitting}
-            variant="gold"
+            variant="primary"
           >
             {submitting ? (
               <>

@@ -102,8 +102,8 @@ export function FiveCsRadar({ data }: { data: FiveCs }) {
           </filter>
           {/* Radial gradient for data fill */}
           <radialGradient id="radar-fill" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor="#22d3ee" stopOpacity="0.35" />
-            <stop offset="100%" stopColor="#06b6d4" stopOpacity="0.08" />
+            <stop offset="0%" stopColor="#e91e8c" stopOpacity="0.35" />
+            <stop offset="100%" stopColor="#e91e8c" stopOpacity="0.08" />
           </radialGradient>
           {/* Dot glow */}
           <filter id="dot-glow" x="-100%" y="-100%" width="300%" height="300%">
@@ -117,7 +117,7 @@ export function FiveCsRadar({ data }: { data: FiveCs }) {
             key={`grid-${level}`}
             points={gridPolygon(ANGLES, level)}
             fill="none"
-            stroke="rgba(148, 163, 184, 0.08)"
+            stroke="rgba(74, 21, 48, 0.8)"
             strokeWidth={level === 100 ? "1" : "0.5"}
           />
         ))}
@@ -132,7 +132,7 @@ export function FiveCsRadar({ data }: { data: FiveCs }) {
               y1={CY}
               x2={x}
               y2={y}
-              stroke="rgba(148, 163, 184, 0.06)"
+              stroke="rgba(74, 21, 48, 0.7)"
               strokeWidth="0.5"
             />
           );
@@ -147,7 +147,7 @@ export function FiveCsRadar({ data }: { data: FiveCs }) {
               x={CX + 8}
               y={y + 3}
               fontSize="8"
-              fill="rgba(148, 163, 184, 0.3)"
+              fill="rgba(173, 104, 131, 0.7)"
               fontFamily="inherit"
             >
               {level}
@@ -159,7 +159,7 @@ export function FiveCsRadar({ data }: { data: FiveCs }) {
         <polygon
           points={polygon(ANGLES, values)}
           fill="url(#radar-fill)"
-          stroke="#22d3ee"
+          stroke="#e91e8c"
           strokeWidth="1.5"
           opacity="0.5"
           filter="url(#radar-glow)"
@@ -169,7 +169,7 @@ export function FiveCsRadar({ data }: { data: FiveCs }) {
         <polygon
           points={polygon(ANGLES, values)}
           fill="url(#radar-fill)"
-          stroke="#22d3ee"
+          stroke="#e91e8c"
           strokeWidth="1.5"
           strokeLinejoin="round"
         />
@@ -213,7 +213,7 @@ export function FiveCsRadar({ data }: { data: FiveCs }) {
               textAnchor="middle"
               fontSize="10"
               fontWeight="600"
-              fill="#94a3b8"
+              fill="#f48fb1"
               fontFamily="inherit"
               letterSpacing="0.05em"
             >
@@ -228,7 +228,7 @@ export function FiveCsRadar({ data }: { data: FiveCs }) {
         {LABELS.map((label, i) => (
           <div
             key={label}
-            className={`stagger-${i + 1} animate-slide-up rounded-lg border border-white/[0.04] bg-surface-200/60 p-2 text-center`}
+            className={`stagger-${i + 1} animate-slide-up rounded-lg border border-[#4a1530] bg-[#2d1420] p-2 text-center`}
           >
             <div className="text-[9px] font-bold uppercase tracking-[0.2em] text-slate-dim">
               {label.slice(0, 4)}

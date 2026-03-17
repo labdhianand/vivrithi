@@ -36,7 +36,7 @@ const cColors: Record<string, string> = {
   Capacity: "text-emerald-glow bg-emerald/15 border-emerald/20",
   Capital: "text-gold-glow bg-gold/15 border-gold/20",
   Collateral: "text-rose-glow bg-rose/15 border-rose/20",
-  Conditions: "text-blue-400 bg-blue-500/15 border-blue-500/20",
+  Conditions: "text-[#ff6bb5] bg-[#e91e8c]/15 border-[#e91e8c]/20",
 };
 
 export default function NotesPage({ params }: { params: { caseId: string } }) {
@@ -93,21 +93,21 @@ export default function NotesPage({ params }: { params: { caseId: string } }) {
         {notes.map((note, i) => (
           <div
             key={note.id}
-            className={`panel p-5 transition-all duration-300 hover:border-white/[0.12] animate-slide-up stagger-${Math.min(i + 2, 6)}`}
+            className={`panel border-[#4a1530] p-5 transition-all duration-300 hover:border-[#7a2550] hover:bg-[#2d1420] animate-slide-up stagger-${Math.min(i + 2, 6)}`}
           >
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0 flex-1">
                 {/* Meta row */}
                 <div className="flex flex-wrap items-center gap-2">
                   {note.note_type && (
-                    <span className="inline-flex items-center gap-1.5 rounded-lg border border-white/[0.08] bg-surface-200 px-2 py-0.5 text-[11px] font-medium uppercase tracking-wider text-slate">
+                    <span className="inline-flex items-center gap-1.5 rounded-lg border border-[#4a1530] bg-[#2d1420] px-2 py-0.5 text-[11px] font-medium uppercase tracking-wider text-slate">
                       {note.note_type.replace(/_/g, " ")}
                     </span>
                   )}
                   {note.affected_c && (
                     <span
                       className={`inline-flex items-center gap-1.5 rounded-lg border px-2 py-0.5 text-[11px] font-medium uppercase tracking-wider ${
-                        cColors[note.affected_c] || "text-slate bg-surface-200 border-white/[0.08]"
+                        cColors[note.affected_c] || "text-slate bg-[#2d1420] border-[#4a1530]"
                       }`}
                     >
                       {note.affected_c}

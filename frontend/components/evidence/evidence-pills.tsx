@@ -47,8 +47,8 @@ export function EvidencePills({
 
   const className =
     tone === "light"
-      ? "inline-flex items-center rounded-full border border-[#d6cdc0] bg-white/70 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#5b6672] transition-colors hover:border-[#bcae99] hover:text-[#213446]"
-      : "inline-flex items-center rounded-full border border-white/[0.08] bg-surface-300/60 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-dim transition-colors hover:border-white/[0.14] hover:text-slate-bright";
+      ? "inline-flex items-center rounded-full border border-[#7a2550] bg-[#3d1a2a] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#ff6bb5] transition-colors hover:border-[#e91e8c] hover:text-[#fce4ec]"
+      : "inline-flex items-center rounded-full border border-[#4a1530] bg-[#2d1420] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#f48fb1] transition-colors hover:border-[#7a2550] hover:text-[#fce4ec]";
 
   return (
     <div className="mt-2 flex flex-wrap gap-2">

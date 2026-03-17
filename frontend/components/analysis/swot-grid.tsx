@@ -43,9 +43,9 @@ const QUADRANTS: QuadrantConfig[] = [
     label: "Opportunities",
     icon: "O",
     borderColor: "border-t-accent",
-    accentColor: "#22d3ee",
-    glowColor: "rgba(6, 182, 212, 0.06)",
-    bgTint: "rgba(6, 182, 212, 0.04)",
+    accentColor: "#e91e8c",
+    glowColor: "rgba(233, 30, 140, 0.06)",
+    bgTint: "rgba(233, 30, 140, 0.04)",
     dotColor: "bg-accent-glow",
   },
   {
@@ -63,7 +63,7 @@ const QUADRANTS: QuadrantConfig[] = [
 function SwotItem({ item, config, index }: { item: SWOTItem; config: QuadrantConfig; index: number }) {
   return (
     <div
-      className={`stagger-${Math.min(index + 1, 6)} animate-slide-up rounded-xl border border-white/[0.04] p-3.5 transition-colors hover:border-white/[0.08]`}
+      className={`stagger-${Math.min(index + 1, 6)} animate-slide-up rounded-xl border border-[#4a1530] p-3.5 transition-colors hover:border-[#7a2550]`}
       style={{ backgroundColor: config.bgTint }}
     >
       <div className="flex items-start gap-2.5">
@@ -111,11 +111,10 @@ export function SwotGrid({ swot }: { swot: SWOT }) {
         {QUADRANTS.map((config) => (
           <div
             key={config.key}
-            className={`panel overflow-hidden border-t-2 p-0 ${config.borderColor}`}
+            className={`panel overflow-hidden border border-[#4a1530] border-t-2 p-0 ${config.borderColor}`}
           >
-            {/* Quadrant header */}
             <div
-              className="flex items-center gap-3 border-b border-white/[0.04] px-5 py-3.5"
+              className="flex items-center gap-3 border-b border-[#4a1530] px-5 py-3.5"
               style={{ backgroundColor: config.glowColor }}
             >
               <div

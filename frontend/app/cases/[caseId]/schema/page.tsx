@@ -86,8 +86,8 @@ export default function SchemaPage({ params }: { params: { caseId: string } }) {
   return (
     <div className="mx-auto max-w-5xl px-4 py-8">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-900">Schema Configuration</h1>
-        <p className="mt-1 text-slate-500">Review default fields, refine the extraction schema, rerun parsing, and edit extracted values inline.</p>
+        <h1 className="text-2xl font-bold text-[#fce4ec]">Schema Configuration</h1>
+        <p className="mt-1 text-[#ad6883]">Review default fields, refine the extraction schema, rerun parsing, and edit extracted values inline.</p>
       </div>
 
       <div className="space-y-6">
@@ -110,25 +110,31 @@ export default function SchemaPage({ params }: { params: { caseId: string } }) {
                 await refresh();
               }}
               onSave={async (fields) => {
+                console.log("Saving schema fields:", fields);
                 const payload = {
                   document_category: schema.document_category,
                   fields,
                   schema_version: schema.schema_version + 1,
                   is_default: false,
                 };
-                if (schema.id.length === 36) {
-                  await updateSchema(params.caseId, schema.id, payload);
-                } else {
-                  await saveSchema(params.caseId, payload);
-                }
-                await refresh();
+                const response = schema.id.length === 36
+                  ? { data: await updateSchema(params.caseId, schema.id, payload) }
+                  : { data: await saveSchema(params.caseId, payload) };
+                console.log("Save response:", response.data);
+                setSchemas((current) =>
+                  current.map((item) =>
+                    item.id === schema.id || item.document_category === response.data.document_category
+                      ? response.data
+                      : item,
+                  ),
+                );
               }}
             />
           );
         })}
 
         {schemas.length === 0 ? (
-          <div className="rounded-xl border border-slate-200 bg-white p-8 text-center text-slate-500 shadow-sm">
+          <div className="rounded-xl border border-[#4a1530] bg-[#1f0d16] p-8 text-center text-[#ad6883] shadow-sm">
             Upload and classify documents to generate editable schemas.
           </div>
         ) : null}

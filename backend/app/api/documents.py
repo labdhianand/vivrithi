@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import uuid
 from pathlib import Path
 
@@ -21,13 +22,14 @@ from ..services.runtime import (
     DocumentArtifact,
     build_docling_artifact,
     build_docling_remote_artifact,
-    build_fast_artifact,
     render_overlay_pdf,
 )
 from ..services.storage import storage
 
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+DOCUMENT_PROCESSING_TIMEOUT_SECONDS = 60.0
 PROCESS_BACKENDS = {
     "legacy",
     "classic",
@@ -40,16 +42,18 @@ PROCESS_BACKENDS = {
     "docling_remote",
     "docling_gpu",
     "docling_gpu_remote",
+    "pdfplumber",
 }
 ARTIFACT_BACKENDS = {
-    "fast_runtime",
-    "marker",
-    "marker_api",
-    "marker_remote",
     "docling",
     "docling_remote",
     "docling_gpu",
     "docling_gpu_remote",
+    "fast_runtime",
+    "marker",
+    "marker_api",
+    "marker_remote",
+    "pdfplumber",
 }
 SUPPORTED_UPLOAD_EXTENSIONS = {
     ".pdf",
@@ -62,46 +66,80 @@ SUPPORTED_UPLOAD_EXTENSIONS = {
     ".tiff",
 }
 _case_processing_tasks: dict[str, asyncio.Task[None]] = {}
+_case_processing_queue: dict[str, list[tuple[str, str]]] = {}
+_case_processing_inflight: dict[str, set[str]] = {}
+
+
+class DocumentProcessingError(RuntimeError):
+    def __init__(self, message: str, status_code: int = 500) -> None:
+        super().__init__(message)
+        self.message = message
+        self.status_code = status_code
 
 
 def _normalize_process_backend(backend: str | None) -> str:
-    selected = (backend or get_settings().document_processing_backend).strip().lower()
+    selected = (backend or get_settings().document_processing_backend or "docling_remote").strip().lower()
     if selected not in PROCESS_BACKENDS:
         raise HTTPException(status_code=400, detail=f"Unsupported backend: {selected}")
-    if selected == "fast":
-        return "fast_runtime"
-    if selected in {"marker", "marker_api"}:
-        return "marker_remote"
-    if selected in {"docling", "docling_remote", "docling_gpu", "docling_gpu_remote"}:
-        return "marker_remote"
-    return selected
+    return "docling_remote"
 
 
 def _normalize_artifact_backend(backend: str | None) -> str:
-    selected = (backend or get_settings().document_processing_backend).strip().lower()
-    if selected == "fast":
-        selected = "fast_runtime"
-    if selected in {"marker", "marker_api"}:
-        selected = "marker_remote"
-    if selected in {"docling_gpu", "docling_gpu_remote", "docling_remote"}:
-        selected = "docling_remote"
+    selected = (backend or get_settings().document_processing_backend or "docling_remote").strip().lower()
     if selected not in ARTIFACT_BACKENDS:
         raise HTTPException(status_code=400, detail=f"Unsupported artifact backend: {selected}")
-    return selected
+    return "docling_remote"
 
 
 async def _build_document_artifact(document: Document, backend: str) -> DocumentArtifact:
     source_path = storage.absolute_path(document.stored_path)
-    category = document.user_category or document.auto_category
     if backend == "docling":
         return build_docling_artifact(source_path)
-    if backend in {"docling_remote", "marker_remote"}:
-        return await build_docling_remote_artifact(source_path)
-    return await build_fast_artifact(
-        source_path,
-        category=category,
-        max_workers=get_settings().document_processing_max_workers,
-    )
+    return await build_docling_remote_artifact(source_path)
+
+
+async def _mark_document_failed(
+    session: AsyncSession,
+    document: Document,
+    message: str,
+) -> None:
+    document.processing_status = "failed"
+    document.failure_reason = (message or "Processing failed")[:1000]
+    await session.commit()
+
+
+async def _run_document_processing_with_timeout(
+    session: AsyncSession,
+    case: Case,
+    document: Document,
+    backend: str,
+) -> Document:
+    try:
+        return await asyncio.wait_for(
+            process_document(session, case, document, backend=backend),
+            timeout=DOCUMENT_PROCESSING_TIMEOUT_SECONDS,
+        )
+    except asyncio.TimeoutError as exc:
+        timeout_label = f"{DOCUMENT_PROCESSING_TIMEOUT_SECONDS:g}"
+        message = f"Processing timed out after {timeout_label} seconds"
+        await _mark_document_failed(session, document, message)
+        logger.error("Document %s timed out after %s seconds", document.id, DOCUMENT_PROCESSING_TIMEOUT_SECONDS)
+        raise DocumentProcessingError(message, status_code=504) from exc
+    except asyncio.CancelledError as exc:
+        message = "Processing cancelled before completion"
+        await _mark_document_failed(session, document, message)
+        logger.warning("Document %s processing was cancelled", document.id)
+        raise DocumentProcessingError(message, status_code=500) from exc
+    except ValueError as exc:
+        message = str(exc)[:1000] or "Invalid processing request"
+        await _mark_document_failed(session, document, message)
+        logger.error("Document %s failed validation during processing: %s", document.id, message)
+        raise DocumentProcessingError(message, status_code=400) from exc
+    except Exception as exc:
+        message = str(exc)[:1000] or "Processing failed"
+        await _mark_document_failed(session, document, message)
+        logger.exception("Document %s failed during processing", document.id)
+        raise DocumentProcessingError(message, status_code=500) from exc
 
 
 async def _ensure_page_image(
@@ -180,44 +218,70 @@ async def _process_document_task(case_id: str, document_id: str, backend: str) -
         if case is None or document is None:
             raise RuntimeError(f"Missing case/document for processing: {case_id}/{document_id}")
         try:
-            await process_document(task_session, case, document, backend=backend)
-        except Exception as exc:
-            document.processing_status = "failed"
-            document.failure_reason = str(exc)[:1000] or "Processing failed"
-            await task_session.commit()
-            raise
+            await _run_document_processing_with_timeout(task_session, case, document, backend=backend)
+        except DocumentProcessingError:
+            return
 
 
-async def _run_case_processing(case_id: str, document_ids: list[str], backend: str) -> None:
+async def _run_case_processing(case_id: str) -> None:
     semaphore = asyncio.Semaphore(get_settings().document_batch_max_concurrency)
+    inflight = _case_processing_inflight.setdefault(case_id, set())
 
-    async def _run(document_id: str) -> None:
-        async with semaphore:
-            await _process_document_task(case_id, document_id, backend)
+    async def _run(document_id: str, backend: str) -> None:
+        inflight.add(document_id)
+        try:
+            async with semaphore:
+                await _process_document_task(case_id, document_id, backend)
+        finally:
+            inflight.discard(document_id)
 
     try:
-        await asyncio.gather(*[_run(document_id) for document_id in document_ids], return_exceptions=False)
+        while True:
+            queued_items = _case_processing_queue.get(case_id, [])
+            if not queued_items:
+                return
+
+            _case_processing_queue[case_id] = []
+            await asyncio.gather(
+                *[_run(document_id, backend) for document_id, backend in queued_items],
+                return_exceptions=False,
+            )
     finally:
+        _case_processing_inflight.pop(case_id, None)
         _case_processing_tasks.pop(case_id, None)
+        if _case_processing_queue.get(case_id):
+            next_task = asyncio.create_task(_run_case_processing(case_id))
+            next_task.add_done_callback(_observe_background_task)
+            _case_processing_tasks[case_id] = next_task
+        else:
+            _case_processing_queue.pop(case_id, None)
 
 
 def _observe_background_task(task: asyncio.Task[None]) -> None:
     try:
         task.result()
-    except Exception:
+    except BaseException:
+        logger.exception("Background case processing task failed unexpectedly")
         return
 
 
 def _enqueue_case_processing(case_id: str, document_ids: list[str], backend: str) -> None:
+    queue = _case_processing_queue.setdefault(case_id, [])
+    inflight = _case_processing_inflight.setdefault(case_id, set())
+    queued_ids = {document_id for document_id, _ in queue}
+
+    for document_id in document_ids:
+        if document_id in inflight or document_id in queued_ids:
+            continue
+        queue.append((document_id, backend))
+        queued_ids.add(document_id)
+
     if case_id in _case_processing_tasks and not _case_processing_tasks[case_id].done():
         return
-    task = asyncio.create_task(_run_case_processing(case_id, document_ids, backend))
+
+    task = asyncio.create_task(_run_case_processing(case_id))
     task.add_done_callback(_observe_background_task)
     _case_processing_tasks[case_id] = task
-
-
-def _case_processing_active(case_id: str) -> bool:
-    return case_id in _case_processing_tasks and not _case_processing_tasks[case_id].done()
 
 
 @router.get("/cases/{case_id}/documents", response_model=list[DocumentRead])
@@ -266,9 +330,14 @@ async def process_document_endpoint(
         document.processing_status = "queued"
         document.failure_reason = None
         await session.commit()
-        processed = await process_document(session, case, document, backend=_normalize_process_backend(backend))
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        processed = await _run_document_processing_with_timeout(
+            session,
+            case,
+            document,
+            backend=_normalize_process_backend(backend),
+        )
+    except DocumentProcessingError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.message) from exc
     return DocumentProcessRead(document=processed, message="Document processed")
 
 
@@ -290,12 +359,10 @@ async def retry_document_processing(
     await session.refresh(document)
     if wait:
         try:
-            processed = await process_document(session, case, document, backend=selected_backend)
-        except ValueError as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
+            processed = await _run_document_processing_with_timeout(session, case, document, backend=selected_backend)
+        except DocumentProcessingError as exc:
+            raise HTTPException(status_code=exc.status_code, detail=exc.message) from exc
         return DocumentProcessRead(document=processed, message="Document retried successfully")
-    if _case_processing_active(case.id):
-        raise HTTPException(status_code=409, detail="Case processing already in progress")
     _enqueue_case_processing(case.id, [document.id], selected_backend)
     await session.refresh(document)
     return DocumentProcessRead(document=document, message="Document retry queued")
@@ -322,20 +389,19 @@ async def process_case_documents(
         return []
     selected_backend = _normalize_process_backend(backend)
     document_ids = [item.id for item in documents]
+    for item in documents:
+        if item.processing_status not in {"extracted", "completed"}:
+            item.processing_status = "queued"
+            item.failure_reason = None
+    await session.commit()
 
     if wait:
-        try:
-            await _run_case_processing(case_id, document_ids, selected_backend)
-        except Exception as exc:
-            raise HTTPException(status_code=500, detail=f"Failed to process one or more documents: {exc}") from exc
+        _enqueue_case_processing(case_id, document_ids, selected_backend)
+        active_task = _case_processing_tasks.get(case_id)
+        if active_task is not None:
+            await active_task
     else:
-        if not _case_processing_active(case_id):
-            for item in documents:
-                if item.processing_status not in {"extracted", "completed"}:
-                    item.processing_status = "queued"
-                    item.failure_reason = None
-            await session.commit()
-            _enqueue_case_processing(case_id, document_ids, selected_backend)
+        _enqueue_case_processing(case_id, document_ids, selected_backend)
     refreshed = await session.execute(
         select(Document).where(Document.case_id == case_id).order_by(Document.created_at)
     )
@@ -351,8 +417,6 @@ async def retry_failed_case_documents(
     case = await session.get(Case, case_id)
     if not case:
         raise HTTPException(status_code=404, detail="Case not found")
-    if _case_processing_active(case_id):
-        raise HTTPException(status_code=409, detail="Case processing already in progress")
     result = await session.execute(
         select(Document).where(Document.case_id == case_id).order_by(Document.created_at)
     )

@@ -295,7 +295,7 @@ def build_docling_artifact(pdf_path: Path) -> DocumentArtifact:
 
 
 def artifact_from_remote_payload(payload: dict[str, Any]) -> DocumentArtifact:
-    backend_name = str(payload.get("backend") or payload.get("method") or "docling_gpu_remote")
+    backend_name = str(payload.get("backend") or payload.get("method") or "pdfplumber")
     pages = [
         ArtifactPage(
             page_number=int(page["page_number"]),

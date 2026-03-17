@@ -3,8 +3,9 @@
 import { useRef, useState } from "react";
 
 import type { DocumentRecord } from "@/lib/types";
+import { Button } from "@/components/ui/button";
 
-type DropzoneState = "idle" | "uploading" | "success" | "error";
+type DropzoneState = "empty" | "uploading" | "classifying" | "complete" | "error";
 
 function formatBytes(bytes: number | null | undefined) {
   if (!bytes) return "";
@@ -13,96 +14,218 @@ function formatBytes(bytes: number | null | undefined) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function formatCategory(category: string | null | undefined) {
+  if (!category) return "Pending classification";
+
+  switch (category) {
+    case "ALM":
+      return "ALM Report";
+    case "Shareholding_Pattern":
+      return "Shareholding Pattern";
+    case "Borrowing_Profile":
+      return "Borrowing Profile";
+    case "Annual_Report":
+      return "Annual Report";
+    case "Portfolio_Performance":
+      return "Portfolio Performance";
+    default:
+      return category.replace(/_/g, " ");
+  }
+}
+
+function formatConfidence(confidence: string | null | undefined) {
+  if (!confidence) return null;
+  return `${Math.round(Number(confidence) * 100)}% confident`;
+}
+
+function stageLabel(document?: DocumentRecord | null) {
+  switch (document?.current_stage || document?.processing_status) {
+    case "queued":
+      return "Queued for processing";
+    case "triaging":
+      return "Reviewing document structure";
+    case "parsing":
+      return "Reading pages and extracting text";
+    case "classifying":
+      return "Classifying document...";
+    case "extracting":
+      return "Preparing extraction after classification";
+    default:
+      return "Classifying document...";
+  }
+}
+
 export function Dropzone({
   title,
   description,
   state,
   error,
   document,
+  file,
+  replacing,
   onFileSelect,
+  onReplace,
 }: {
   title: string;
   description: string;
   state: DropzoneState;
-  error?: string;
+  error?: string | null;
   document?: DocumentRecord | null;
+  file?: File | null;
+  replacing?: boolean;
   onFileSelect: (file: File) => void;
+  onReplace?: () => void;
 }) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [dragActive, setDragActive] = useState(false);
 
-  const borderClass =
-    state === "success"
-      ? "border-2 border-emerald-500"
-      : state === "error"
-        ? "border border-red-400"
-        : state === "uploading"
-          ? "border border-blue-400"
-          : "border border-dashed border-slate-300";
+  const activeFileName = file?.name || document?.original_filename || "Untitled document";
+  const activeFileSize = file?.size ?? document?.file_size_bytes;
+  const confidenceLabel = formatConfidence(document?.auto_category_confidence);
+  const showDropzone = state === "empty" || state === "error";
+
+  function openPicker() {
+    inputRef.current?.click();
+  }
+
+  function handleSelectedFile(nextFile?: File) {
+    if (!nextFile) {
+      return;
+    }
+    onFileSelect(nextFile);
+  }
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+    <div className="panel border-gradient flex h-full flex-col p-5">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h3 className="font-semibold text-slate-900">{title}</h3>
-          <p className="mt-1 text-sm text-slate-500">{description}</p>
+          <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-slate-dim">Required section</p>
+          <h3 className="mt-2 text-lg font-semibold text-slate-bright">{title}</h3>
+          <p className="mt-1 text-sm text-slate-dim">{description}</p>
         </div>
-        {state === "success" ? (
-          <div className="rounded-full bg-emerald-100 p-2 text-emerald-600">
-            <svg className="h-4 w-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
+        {state === "complete" ? (
+          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald/15 text-emerald-glow">
+            <svg className="h-5 w-5" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
               <path strokeLinecap="round" strokeLinejoin="round" d="M5 10.5 8.5 14 15 6.5" />
             </svg>
-          </div>
+          </span>
         ) : null}
       </div>
 
-      <button
-        type="button"
-        onClick={() => inputRef.current?.click()}
-        onDragOver={(event) => {
-          event.preventDefault();
-          setDragActive(true);
-        }}
-        onDragLeave={(event) => {
-          event.preventDefault();
-          setDragActive(false);
-        }}
-        onDrop={(event) => {
-          event.preventDefault();
-          setDragActive(false);
-          const nextFile = Array.from(event.dataTransfer.files)[0];
-          if (nextFile) {
-            onFileSelect(nextFile);
-          }
-        }}
-        className={`mt-4 flex w-full flex-col items-center justify-center rounded-xl px-4 py-8 text-center transition-colors ${borderClass} ${dragActive ? "bg-blue-50" : "bg-slate-50"}`}
-      >
-        {state === "uploading" ? (
-          <>
-            <span className="h-6 w-6 animate-spin rounded-full border-2 border-blue-200 border-t-blue-600" />
-            <p className="mt-3 font-medium text-slate-900">Uploading...</p>
-          </>
-        ) : state === "success" && document ? (
-          <>
-            <p className="max-w-full truncate font-medium text-slate-900">{document.original_filename}</p>
-            <p className="mt-1 text-sm text-slate-500">{formatBytes(document.file_size_bytes)}</p>
-            <div className="mt-3 inline-flex items-center rounded-full bg-blue-50 px-3 py-1 text-sm text-blue-700">
-              {(document.user_category || document.auto_category || "Pending").replace(/_/g, " ")}
-              {document.auto_category_confidence ? ` - ${Math.round(Number(document.auto_category_confidence) * 100)}%` : ""}
+      {showDropzone ? (
+        <div className="mt-5 flex flex-1 flex-col">
+          {state === "error" ? (
+            <div className="mb-3 rounded-2xl border border-rose/30 bg-rose/[0.12] px-4 py-3 text-sm text-rose-glow">
+              {error || "Upload or classification failed. Try again."}
             </div>
-          </>
-        ) : state === "error" ? (
-          <>
-            <p className="font-medium text-red-600">{error || "Upload failed"}</p>
-            <p className="mt-2 text-sm text-slate-500">Try again</p>
-          </>
-        ) : (
-          <>
-            <p className="font-medium text-slate-900">Drag & drop or click to browse</p>
-            <p className="mt-2 text-sm text-slate-500">Accepts .pdf .xlsx .xls .png .jpg .jpeg</p>
-          </>
-        )}
-      </button>
+          ) : null}
+
+          <button
+            type="button"
+            onClick={openPicker}
+            onDragOver={(event) => {
+              event.preventDefault();
+              setDragActive(true);
+            }}
+            onDragLeave={(event) => {
+              event.preventDefault();
+              setDragActive(false);
+            }}
+            onDrop={(event) => {
+              event.preventDefault();
+              setDragActive(false);
+              handleSelectedFile(Array.from(event.dataTransfer.files)[0]);
+            }}
+            className={`flex flex-1 flex-col items-center justify-center rounded-2xl border border-dashed px-4 py-10 text-center transition-all duration-200 ${
+              dragActive
+                ? "border-accent/70 bg-accent/[0.12]"
+                  : state === "error"
+                  ? "border-rose/40 bg-rose/[0.06]"
+                  : "border-[#4a1530] bg-[#2d1420]/40 hover:border-[#7a2550] hover:bg-[#2d1420]/70"
+            }`}
+          >
+            <span className="text-sm font-semibold text-slate-bright">Drag &amp; drop or click to browse</span>
+            <span className="mt-2 text-xs text-slate-dim">Accepts .pdf .xlsx .xls .png .jpg .jpeg</span>
+          </button>
+
+          {state === "error" ? (
+            <div className="mt-3">
+              <Button type="button" variant="secondary" size="sm" onClick={openPicker}>
+                Try again
+              </Button>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
+      {state === "uploading" ? (
+        <div className="mt-5 rounded-2xl border border-accent/25 bg-accent/[0.12] p-4">
+          <p className="truncate text-sm font-semibold text-slate-bright">{activeFileName}</p>
+          <div className="mt-4 flex items-center gap-3 text-sm text-[#f48fb1]">
+            <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#ff6bb5]/30 border-t-[#ff6bb5]" />
+            <span>Uploading...</span>
+          </div>
+          <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-[#2d1420]">
+            <div className="h-full w-2/5 animate-pulse rounded-full bg-accent" />
+          </div>
+        </div>
+      ) : null}
+
+      {state === "classifying" ? (
+        <div className="mt-5 rounded-2xl border border-[#7a2550]/50 bg-[#e91e8c]/10 p-4">
+          <p className="truncate text-sm font-semibold text-slate-bright">{activeFileName}</p>
+          <p className="mt-1 text-xs text-slate-dim">{formatBytes(activeFileSize)}</p>
+
+          <div className="mt-4 flex items-center gap-3 text-sm text-[#f48fb1]">
+            <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#ff6bb5]/30 border-t-[#ff6bb5]" />
+            <span>Classifying document...</span>
+          </div>
+
+          <p className="mt-2 text-xs text-slate-dim">{stageLabel(document)}</p>
+
+          <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-[#2d1420]">
+            <div
+              className="h-full rounded-full bg-[#ff6bb5] transition-all duration-500"
+              style={{ width: `${Math.max(document?.progress_percent || 12, 12)}%` }}
+            />
+          </div>
+        </div>
+      ) : null}
+
+      {state === "complete" ? (
+        <div className="mt-5 rounded-2xl border border-emerald/25 bg-emerald/[0.08] p-4">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-slate-bright">{activeFileName}</p>
+              <p className="mt-1 text-xs text-slate-dim">{formatBytes(activeFileSize)}</p>
+            </div>
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald/15 text-emerald-glow">
+              <svg className="h-4 w-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 10.5 8.5 14 15 6.5" />
+              </svg>
+            </span>
+          </div>
+
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <span className="inline-flex items-center rounded-full bg-[#3d1a2a] px-3 py-1 text-xs font-semibold text-[#ff6bb5]">
+              {formatCategory(document?.auto_category || document?.user_category)}
+              {confidenceLabel ? ` - ${confidenceLabel}` : ""}
+            </span>
+
+            {onReplace ? (
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                disabled={replacing}
+                onClick={onReplace}
+              >
+                {replacing ? "Removing..." : "Replace file"}
+              </Button>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
 
       <input
         ref={inputRef}
@@ -110,22 +233,10 @@ export function Dropzone({
         hidden
         accept=".pdf,.xlsx,.xls,.png,.jpg,.jpeg"
         onChange={(event) => {
-          const nextFile = Array.from(event.target.files || [])[0];
-          if (nextFile) {
-            onFileSelect(nextFile);
-          }
+          handleSelectedFile(Array.from(event.target.files || [])[0]);
+          event.currentTarget.value = "";
         }}
       />
-
-      {state === "error" ? (
-        <button
-          type="button"
-          onClick={() => inputRef.current?.click()}
-          className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-100"
-        >
-          Try again
-        </button>
-      ) : null}
     </div>
   );
 }

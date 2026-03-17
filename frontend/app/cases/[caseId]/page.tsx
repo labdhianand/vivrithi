@@ -27,7 +27,7 @@ const processingTone: Record<string, "default" | "success" | "warn" | "danger" |
 
 function StatBlock({ label, value, unit }: { label: string; value: string; unit?: string }) {
   return (
-    <div className="rounded-xl border border-white/[0.06] bg-surface-100 p-4 transition-colors duration-200 hover:border-white/[0.1]">
+    <div className="rounded-xl border border-[#4a1530] bg-[#1f0d16] p-4 transition-colors duration-200 hover:border-[#7a2550] hover:bg-[#2d1420]">
       <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-dim">{label}</div>
       <div className="mt-2 text-lg font-semibold text-slate-bright">
         {value}
@@ -60,15 +60,10 @@ export default function CaseOverviewPage({ params }: { params: { caseId: string 
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-      {/* Left column: Overview */}
       <Card glow className="animate-slide-up space-y-6">
         <div>
-          <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-dim">
-            Case Overview
-          </div>
-          <h2 className="text-gradient mt-2 font-serif text-3xl">
-            {record?.company_name || "Untitled Case"}
-          </h2>
+          <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-dim">Case Overview</div>
+          <h2 className="text-gradient mt-2 font-serif text-3xl">{record?.company_name || "Untitled Case"}</h2>
           {record?.status && (
             <div className="mt-3">
               <Badge
@@ -96,7 +91,7 @@ export default function CaseOverviewPage({ params }: { params: { caseId: string 
           </div>
         </div>
 
-        <div className="flex gap-3 border-t border-white/[0.06] pt-5">
+        <div className="flex gap-3 border-t border-[#4a1530] pt-5">
           <Link href={`/cases/${params.caseId}/upload`}>
             <Button>
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="mr-1">
@@ -112,20 +107,20 @@ export default function CaseOverviewPage({ params }: { params: { caseId: string 
         </div>
       </Card>
 
-      {/* Right column: Document inventory */}
       <Card className="animate-slide-up stagger-2">
         <div className="flex items-center justify-between">
-          <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-dim">
-            Document Inventory
-          </div>
+          <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-dim">Document Inventory</div>
           <span className="text-xs text-slate-dim">{documents.length} file{documents.length !== 1 && "s"}</span>
         </div>
 
         <div className="mt-4 space-y-2">
           {documents.length === 0 && (
-            <div className="rounded-xl border border-dashed border-white/[0.08] py-10 text-center">
+            <div className="rounded-xl border border-dashed border-[#4a1530] py-10 text-center">
               <p className="text-sm text-slate-dim">No documents uploaded yet.</p>
-              <Link href={`/cases/${params.caseId}/upload`} className="mt-2 inline-block text-xs text-accent hover:text-accent-glow transition-colors">
+              <Link
+                href={`/cases/${params.caseId}/upload`}
+                className="mt-2 inline-block text-xs text-accent transition-colors hover:text-accent-glow"
+              >
                 Upload your first document
               </Link>
             </div>
@@ -133,7 +128,7 @@ export default function CaseOverviewPage({ params }: { params: { caseId: string 
           {documents.map((item, idx) => (
             <div
               key={item.id}
-              className={`animate-fade-in stagger-${Math.min(idx + 1, 6)} group flex items-start justify-between rounded-xl border border-white/[0.06] bg-surface-100 p-4 transition-all duration-200 hover:border-white/[0.1] hover:bg-surface-200`}
+              className={`animate-fade-in stagger-${Math.min(idx + 1, 6)} group flex items-start justify-between rounded-xl border border-[#4a1530] bg-[#1f0d16] p-4 transition-all duration-200 hover:border-[#7a2550] hover:bg-[#2d1420]`}
             >
               <div className="min-w-0 flex-1">
                 <div className="truncate font-medium text-sm text-slate-bright group-hover:text-accent-glow transition-colors">

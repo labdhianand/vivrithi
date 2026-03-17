@@ -104,11 +104,11 @@ export function CamPreview({ report }: { report: ReportRecord }) {
           </p>
 
           <div className="mt-5 grid gap-3">
-            <div className="rounded-2xl border border-white/[0.06] bg-surface-200/50 p-3.5">
+            <div className="rounded-2xl border border-[#4a1530] bg-[#2d1420] p-3.5">
               <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-slate-dim">Sections</p>
               <p className="mt-2 text-2xl font-semibold text-gradient">{sections.length}</p>
             </div>
-            <div className="rounded-2xl border border-white/[0.06] bg-surface-200/50 p-3.5">
+            <div className="rounded-2xl border border-[#4a1530] bg-[#2d1420] p-3.5">
               <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-slate-dim">Generated</p>
               <p className="mt-2 text-sm font-medium text-slate-bright">{formatReportDate(report.created_at)}</p>
             </div>
@@ -121,7 +121,7 @@ export function CamPreview({ report }: { report: ReportRecord }) {
               <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-dim">Contents</p>
               <p className="mt-1 text-sm text-slate">Jump directly into a CAM section.</p>
             </div>
-            <div className="rounded-full border border-white/[0.08] bg-surface-200/60 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-dim">
+            <div className="rounded-full border border-[#4a1530] bg-[#2d1420] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-dim">
               {sections.length}
             </div>
           </div>
@@ -131,7 +131,7 @@ export function CamPreview({ report }: { report: ReportRecord }) {
               <a
                 key={section.id}
                 href={`#${anchorForSection(section.id, index)}`}
-                className="group flex items-start gap-3 rounded-xl border border-white/[0.05] bg-surface-200/30 px-3 py-2.5 transition-all duration-200 hover:border-accent/20 hover:bg-surface-200/70"
+                className="group flex items-start gap-3 rounded-xl border border-[#4a1530] bg-[#2d1420]/70 px-3 py-2.5 transition-all duration-200 hover:border-[#7a2550] hover:bg-[#2d1420]"
               >
                 <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-surface-100 text-[10px] font-bold text-slate-dim group-hover:text-accent-glow">
                   {String(index + 1).padStart(2, "0")}
@@ -147,46 +147,46 @@ export function CamPreview({ report }: { report: ReportRecord }) {
       </aside>
 
       <div className="panel overflow-hidden p-0">
-        <div className="border-b border-white/[0.06] bg-surface-100/80 px-5 py-4 sm:px-6">
+        <div className="border-b border-[#4a1530] bg-[#2d1420] px-5 py-4 sm:px-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-slate-dim">Report Preview</p>
               <h3 className="mt-1 font-serif text-2xl text-slate-bright">Credit Appraisal Memo</h3>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-full border border-white/[0.08] bg-surface-200/60 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-dim">
+              <span className="rounded-full border border-[#4a1530] bg-[#3d1a2a] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-dim">
                 Memo-style preview
               </span>
-              <span className="rounded-full border border-white/[0.08] bg-surface-200/60 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-dim">
+              <span className="rounded-full border border-[#4a1530] bg-[#3d1a2a] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-dim">
                 {sections.length} sections
               </span>
             </div>
           </div>
         </div>
 
-        <div className="bg-[radial-gradient(circle_at_top,_rgba(88,176,214,0.12),_transparent_35%),linear-gradient(180deg,_rgba(255,255,255,0.02),_rgba(255,255,255,0))] p-4 sm:p-6 lg:p-8">
-          <div className="mx-auto max-w-4xl rounded-[28px] border border-[#d6cdc0] bg-[#f6f1e8] text-[#1d2731] shadow-[0_24px_80px_rgba(0,0,0,0.28)]">
-            <div className="border-b border-[#d6cdc0] px-6 py-8 sm:px-10">
-              <p className="text-center text-[11px] font-semibold uppercase tracking-[0.35em] text-[#61717f]">
+        <div className="bg-[radial-gradient(circle_at_top,_rgba(233,30,140,0.12),_transparent_35%),linear-gradient(180deg,_rgba(255,255,255,0.02),_rgba(255,255,255,0))] p-4 sm:p-6 lg:p-8">
+          <div className="mx-auto max-w-4xl rounded-[28px] border border-[#4a1530] bg-[#1f0d16] text-[#fce4ec] shadow-[0_24px_80px_rgba(26,8,16,0.45)]">
+            <div className="border-b border-[#4a1530] px-6 py-8 sm:px-10">
+              <p className="text-center text-[11px] font-semibold uppercase tracking-[0.35em] text-[#ad6883]">
                 Intelli-Credit Copilot
               </p>
-              <h2 className="mt-4 text-center font-serif text-4xl leading-tight text-[#213446] sm:text-[2.8rem]">
+              <h2 className="mt-4 text-center font-serif text-4xl leading-tight text-[#fce4ec] sm:text-[2.8rem]">
                 Credit Appraisal Memo
               </h2>
-              <p className="mt-3 text-center text-base text-[#52606d]">{summarySnippet}</p>
+              <p className="mt-3 text-center text-base text-[#f48fb1]">{summarySnippet}</p>
 
               <div className="mt-6 grid gap-3 md:grid-cols-3">
-                <div className="rounded-2xl border border-[#d6cdc0] bg-white/55 p-4">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#6c7883]">Prepared</p>
-                  <p className="mt-2 font-serif text-lg text-[#213446]">{formatReportDate(report.created_at)}</p>
+                <div className="rounded-2xl border border-[#4a1530] bg-[#2d1420] p-4">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#ad6883]">Prepared</p>
+                  <p className="mt-2 font-serif text-lg text-[#fce4ec]">{formatReportDate(report.created_at)}</p>
                 </div>
-                <div className="rounded-2xl border border-[#d6cdc0] bg-white/55 p-4">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#6c7883]">Sections</p>
-                  <p className="mt-2 font-serif text-lg text-[#213446]">{sections.length}</p>
+                <div className="rounded-2xl border border-[#4a1530] bg-[#2d1420] p-4">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#ad6883]">Sections</p>
+                  <p className="mt-2 font-serif text-lg text-[#fce4ec]">{sections.length}</p>
                 </div>
-                <div className="rounded-2xl border border-[#d6cdc0] bg-white/55 p-4">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#6c7883]">Format</p>
-                  <p className="mt-2 font-serif text-lg text-[#213446]">CAM Draft</p>
+                <div className="rounded-2xl border border-[#4a1530] bg-[#2d1420] p-4">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#ad6883]">Format</p>
+                  <p className="mt-2 font-serif text-lg text-[#fce4ec]">CAM Draft</p>
                 </div>
               </div>
             </div>
@@ -196,17 +196,17 @@ export function CamPreview({ report }: { report: ReportRecord }) {
                 <section
                   key={section.id}
                   id={anchorForSection(section.id, index)}
-                  className={`py-8 ${index > 0 ? "border-t border-[#d6cdc0]" : "pt-0"}`}
+                  className={`py-8 ${index > 0 ? "border-t border-[#4a1530]" : "pt-0"}`}
                 >
                   <div className="flex flex-wrap items-start gap-4">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#cbbba4] bg-white/70 text-sm font-semibold text-[#213446]">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#7a2550] bg-[#3d1a2a] text-sm font-semibold text-[#fce4ec]">
                       {String(index + 1).padStart(2, "0")}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-[#73808c]">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-[#ad6883]">
                         {prettifyId(section.id)}
                       </p>
-                      <h3 className="mt-2 font-serif text-3xl leading-tight text-[#213446]">
+                      <h3 className="mt-2 font-serif text-3xl leading-tight text-[#fce4ec]">
                         {section.title}
                       </h3>
                     </div>
@@ -216,7 +216,7 @@ export function CamPreview({ report }: { report: ReportRecord }) {
                     {parseMarkdown(section.content_markdown).map((block, blockIndex) => {
                       if (block.kind === "heading") {
                         return (
-                          <h4 key={blockIndex} className="font-serif text-2xl text-[#213446]">
+                          <h4 key={blockIndex} className="font-serif text-2xl text-[#fce4ec]">
                             {block.text}
                           </h4>
                         );
@@ -224,7 +224,7 @@ export function CamPreview({ report }: { report: ReportRecord }) {
 
                       if (block.kind === "subheading") {
                         return (
-                          <h5 key={blockIndex} className="text-sm font-semibold uppercase tracking-[0.24em] text-[#61717f]">
+                          <h5 key={blockIndex} className="text-sm font-semibold uppercase tracking-[0.24em] text-[#ad6883]">
                             {block.text}
                           </h5>
                         );
@@ -236,34 +236,34 @@ export function CamPreview({ report }: { report: ReportRecord }) {
                           return (
                             <div
                               key={blockIndex}
-                              className="grid gap-2 rounded-2xl border border-[#ddd3c6] bg-white/55 px-4 py-3 md:grid-cols-[220px_minmax(0,1fr)]"
+                              className="grid gap-2 rounded-2xl border border-[#4a1530] bg-[#2d1420] px-4 py-3 md:grid-cols-[220px_minmax(0,1fr)]"
                             >
-                              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#61717f]">
+                              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#ad6883]">
                                 {pair.label}
                               </div>
-                              <div className="text-[15px] leading-7 text-[#1d2731]">{pair.value}</div>
+                              <div className="text-[15px] leading-7 text-[#fce4ec]">{pair.value}</div>
                             </div>
                           );
                         }
 
                         return (
-                          <div key={blockIndex} className="flex gap-3 rounded-2xl border border-[#ddd3c6] bg-white/45 px-4 py-3">
-                            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#213446]" />
-                            <p className="text-[15px] leading-7 text-[#1d2731]">{block.text}</p>
+                          <div key={blockIndex} className="flex gap-3 rounded-2xl border border-[#4a1530] bg-[#2d1420] px-4 py-3">
+                            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#ff6bb5]" />
+                            <p className="text-[15px] leading-7 text-[#fce4ec]">{block.text}</p>
                           </div>
                         );
                       }
 
                       return (
-                        <p key={blockIndex} className="text-[15px] leading-8 text-[#24313c]">
+                        <p key={blockIndex} className="text-[15px] leading-8 text-[#fce4ec]">
                           {block.text}
                         </p>
                       );
                     })}
                   </div>
 
-                  <div className="mt-5 rounded-2xl border border-[#ddd3c6] bg-white/45 px-4 py-3">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[#73808c]">Evidence Trail</p>
+                  <div className="mt-5 rounded-2xl border border-[#4a1530] bg-[#2d1420] px-4 py-3">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[#ad6883]">Evidence Trail</p>
                     <EvidencePills refs={section.evidence_refs} caseId={report.case_id} tone="light" />
                   </div>
                 </section>

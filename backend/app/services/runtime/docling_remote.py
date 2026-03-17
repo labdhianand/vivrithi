@@ -1,21 +1,161 @@
-from __future__ import annotations
-
+"""
+Marker PDF client — replaces Docling remote.
+Sends full PDFs to Marker API on GPU via SSH tunnel port 8001.
+Falls back to full pdfplumber if tunnel is down.
+Connect timeout 5s — fails fast if tunnel is down.
+Read timeout 180s — allows large annual reports on A100.
+No page cap on either path — full document always processed.
+"""
 import asyncio
 import logging
-from dataclasses import dataclass
+import httpx
+import pdfplumber
 from pathlib import Path
+
+logger          = logging.getLogger(__name__)
+MARKER_URL      = "http://127.0.0.1:8001"
+CONNECT_TIMEOUT = 5
+READ_TIMEOUT    = 180
+
+
+async def convert_pdf_to_markdown(file_path: str) -> dict:
+    """
+    Primary path: send FULL PDF to Marker on GPU.
+    No page cap — Marker processes entire document on A100.
+    Connect timeout 5s so tunnel failures are instant.
+    Read timeout 180s for large annual reports.
+    """
+    try:
+        timeout = httpx.Timeout(
+            connect=CONNECT_TIMEOUT,
+            read=READ_TIMEOUT,
+            write=60,
+            pool=5,
+        )
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            with open(file_path, "rb") as f:
+                response = await client.post(
+                    f"{MARKER_URL}/convert",
+                    files={
+                        "pdf_file": (
+                            Path(file_path).name,
+                            f,
+                            "application/pdf",
+                        )
+                    },
+                )
+        if response.status_code == 200:
+            data = response.json()
+            markdown = data.get("markdown", "")
+            if markdown:
+                logger.info(
+                    f"Marker processed {Path(file_path).name}"
+                    f" ({len(markdown)} chars)"
+                )
+                return {
+                    "markdown": markdown,
+                    "method":   "marker_api",
+                    "success":  True,
+                    "pages":    [],
+                    "metadata": {},
+                }
+        raise Exception(
+            f"Marker returned HTTP {response.status_code}"
+        )
+    except httpx.ConnectError as e:
+        logger.warning(
+            f"Marker tunnel not reachable, "
+            f"falling back to pdfplumber: {e}"
+        )
+        return await _pdfplumber_fallback(file_path, str(e))
+    except httpx.ConnectTimeout as e:
+        logger.warning(
+            f"Marker tunnel connect timed out after "
+            f"{CONNECT_TIMEOUT}s, falling back: {e}"
+        )
+        return await _pdfplumber_fallback(file_path, str(e))
+    except Exception as e:
+        logger.warning(
+            f"Marker failed ({e}), using pdfplumber fallback"
+        )
+        return await _pdfplumber_fallback(file_path, str(e))
+
+
+async def _pdfplumber_fallback(
+    file_path: str,
+    error: str = "",
+) -> dict:
+    """
+    Fallback: extract FULL document using pdfplumber.
+    No page cap — reads entire document.
+    Runs in thread executor to avoid blocking async loop.
+    """
+    def _extract():
+        pages_text = []
+        tables     = []
+        try:
+            with pdfplumber.open(file_path) as pdf:
+                for page in pdf.pages:
+                    text = page.extract_text()
+                    if text:
+                        pages_text.append(text)
+                    pt = page.extract_tables()
+                    if pt:
+                        tables.extend(pt)
+        except Exception as ex:
+            logger.error(f"pdfplumber extraction failed: {ex}")
+        return "\n\n".join(pages_text), tables
+
+    loop = asyncio.get_event_loop()
+    text, tables = await loop.run_in_executor(None, _extract)
+    return {
+        "markdown": text,
+        "method":   "pdfplumber_fallback",
+        "success":  bool(text),
+        "pages":    [],
+        "metadata": {"tables": tables},
+        "error":    error,
+    }
+
+
+def convert_pdf_to_markdown_sync(file_path: str) -> dict:
+    """Synchronous wrapper for non-async contexts"""
+    return asyncio.run(convert_pdf_to_markdown(file_path))
+
+
+async def get_first_page_text(file_path: str) -> str:
+    """
+    Fast first-page extraction for classification only.
+    Always uses pdfplumber — never calls Marker for this.
+    Only reads page 1 for speed.
+    """
+    def _extract():
+        try:
+            with pdfplumber.open(file_path) as pdf:
+                if pdf.pages:
+                    return pdf.pages[0].extract_text() or ""
+        except Exception:
+            pass
+        return ""
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, _extract)
+
+
+async def check_marker_health() -> bool:
+    """Check if Marker tunnel is up. 5 second timeout."""
+    try:
+        async with httpx.AsyncClient(timeout=5) as client:
+            r = await client.get(f"{MARKER_URL}/health")
+            return r.status_code == 200
+    except Exception:
+        return False
+
+
+from dataclasses import dataclass
 from time import perf_counter
 from typing import Any
 
-import httpx
-import pdfplumber
-
-from ...config import get_settings
 from ..types import ParsedPage, ParsedTable
-
-
-logger = logging.getLogger(__name__)
-TIMEOUT = 120
 
 
 @dataclass(slots=True)
@@ -25,10 +165,6 @@ class RemoteDoclingResult:
     page_count: int
     convert_seconds: float
     payload: dict[str, Any]
-
-
-def _marker_url() -> str:
-    return get_settings().marker_api_url.rstrip("/")
 
 
 def _table_markdown(rows: list[list[str | None]]) -> str:
@@ -67,9 +203,9 @@ def _table_cells(rows: list[list[str | None]]) -> list[dict[str, Any]]:
     return cells
 
 
-def build_marker_payload_sync(
+def build_pdfplumber_payload_sync(
     file_path: str,
-    conversion: dict[str, Any] | None = None,
+    conversion: dict | None = None,
 ) -> dict[str, Any]:
     conversion = conversion or {}
     document_markdown = conversion.get("markdown") or ""
@@ -194,128 +330,6 @@ def build_marker_payload_sync(
     }
 
 
-async def convert_pdf_to_markdown(file_path: str) -> dict[str, Any]:
-    """
-    Primary path: send PDF to Marker on GPU via tunnel.
-    Returns clean markdown preserving tables and structure.
-    """
-    try:
-        async with httpx.AsyncClient(timeout=TIMEOUT) as client:
-            with open(file_path, "rb") as file_handle:
-                response = await client.post(
-                    f"{_marker_url()}/convert",
-                    files={
-                        "pdf_file": (
-                            Path(file_path).name,
-                            file_handle,
-                            "application/pdf",
-                        )
-                    },
-                )
-        if response.status_code == 200:
-            data = response.json()
-            if data.get("success", True):
-                return {
-                    "markdown": data.get("markdown", ""),
-                    "method": "marker_api",
-                    "success": True,
-                    "pages": [],
-                    "metadata": {},
-                }
-            raise RuntimeError(data.get("error") or "Marker conversion failed")
-        raise RuntimeError(f"Marker returned HTTP {response.status_code}")
-    except Exception as exc:
-        logger.warning("Marker unavailable (%s), using pdfplumber fallback", exc)
-        return await _pdfplumber_fallback(file_path, str(exc))
-
-
-async def _pdfplumber_fallback(
-    file_path: str,
-    error: str = "",
-) -> dict[str, Any]:
-    """
-    Fallback when Marker tunnel is down.
-    Extracts text and tables using pdfplumber.
-    """
-
-    def _extract() -> tuple[str, list[Any]]:
-        pages_text: list[str] = []
-        tables: list[Any] = []
-        try:
-            with pdfplumber.open(file_path) as pdf:
-                for page in pdf.pages:
-                    text = page.extract_text()
-                    if text:
-                        pages_text.append(text)
-                    page_tables = page.extract_tables() or []
-                    if page_tables:
-                        tables.extend(page_tables)
-        except Exception as exc:
-            logger.error("pdfplumber fallback failed for %s: %s", file_path, exc)
-        return "\n\n".join(pages_text), tables
-
-    text, tables = await asyncio.to_thread(_extract)
-    return {
-        "markdown": text,
-        "method": "pdfplumber_fallback",
-        "success": bool(text),
-        "pages": [],
-        "metadata": {"tables": tables},
-        "error": error,
-    }
-
-
-def convert_pdf_to_markdown_sync(file_path: str) -> dict[str, Any]:
-    return asyncio.run(convert_pdf_to_markdown(file_path))
-
-
-async def get_first_page_text(file_path: str) -> str:
-    """
-    Fast first-page extraction for classification only.
-    Uses pdfplumber and never calls Marker.
-    """
-
-    def _extract() -> str:
-        try:
-            with pdfplumber.open(file_path) as pdf:
-                if pdf.pages:
-                    return (pdf.pages[0].extract_text() or "").strip()
-        except Exception:
-            return ""
-        return ""
-
-    return await asyncio.to_thread(_extract)
-
-
-async def check_marker_health() -> bool:
-    try:
-        async with httpx.AsyncClient(timeout=5) as client:
-            response = await client.get(f"{_marker_url()}/health")
-            return response.status_code == 200
-    except Exception:
-        return False
-
-
-class DoclingRemoteBackend:
-    async def convert(self, source_path: Path) -> RemoteDoclingResult:
-        started = perf_counter()
-        conversion = await convert_pdf_to_markdown(str(source_path))
-        payload = await asyncio.to_thread(
-            build_marker_payload_sync,
-            str(source_path),
-            conversion,
-        )
-        elapsed = perf_counter() - started
-        payload["convert_seconds"] = round(elapsed, 6)
-        return RemoteDoclingResult(
-            markdown=payload.get("markdown", ""),
-            text=payload.get("text", ""),
-            page_count=int(payload.get("page_count") or 0),
-            convert_seconds=elapsed,
-            payload=payload,
-        )
-
-
 def parsed_pages_from_remote_payload(payload: dict[str, Any]) -> list[ParsedPage]:
     parsed_pages: list[ParsedPage] = []
     for page in payload.get("pages", []):
@@ -335,11 +349,31 @@ def parsed_pages_from_remote_payload(payload: dict[str, Any]) -> list[ParsedPage
                 markdown=page.get("markdown") or "",
                 tables=tables,
                 bounding_boxes=page.get("bounding_boxes") or [],
-                parser_used=page.get("parser_used") or page.get("route") or "docling_gpu_remote",
+                parser_used=page.get("parser_used") or page.get("route") or "marker_api",
                 confidence=0.94 if payload.get("backend") == "marker_api" else 0.78,
             )
         )
     return parsed_pages
+
+
+class DoclingRemoteBackend:
+    async def convert(self, source_path: Path) -> RemoteDoclingResult:
+        started = perf_counter()
+        conversion = await convert_pdf_to_markdown(str(source_path))
+        payload = await asyncio.to_thread(
+            build_pdfplumber_payload_sync,
+            str(source_path),
+            conversion,
+        )
+        elapsed = perf_counter() - started
+        payload["convert_seconds"] = round(elapsed, 6)
+        return RemoteDoclingResult(
+            markdown=payload.get("markdown", ""),
+            text=payload.get("text", ""),
+            page_count=int(payload.get("page_count") or 0),
+            convert_seconds=elapsed,
+            payload=payload,
+        )
 
 
 _remote_backend: DoclingRemoteBackend | None = None

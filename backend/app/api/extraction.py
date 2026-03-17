@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import asyncio
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,6 +16,8 @@ from ..services.document_pipeline import process_document
 
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+PROCESS_DOCUMENT_TIMEOUT_SECONDS = 60.0
 
 
 def _derive_correction_type(extraction: Extraction, payload: ExtractionUpdate) -> str | None:
@@ -70,9 +75,27 @@ async def rerun_extraction(
         raise HTTPException(status_code=404, detail="Document not found")
     case = await session.get(Case, document.case_id)
     try:
-        await process_document(session, case, document, backend=backend)
+        await asyncio.wait_for(
+            process_document(session, case, document, backend=backend),
+            timeout=PROCESS_DOCUMENT_TIMEOUT_SECONDS,
+        )
+    except asyncio.TimeoutError as exc:
+        document.processing_status = "failed"
+        document.failure_reason = f"Processing timed out after {PROCESS_DOCUMENT_TIMEOUT_SECONDS:g} seconds"
+        await session.commit()
+        logger.error("Document %s timed out during extraction rerun", doc_id)
+        raise HTTPException(status_code=504, detail=document.failure_reason) from exc
     except ValueError as exc:
+        document.processing_status = "failed"
+        document.failure_reason = str(exc)[:1000] or "Extraction rerun failed"
+        await session.commit()
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        document.processing_status = "failed"
+        document.failure_reason = str(exc)[:1000] or "Extraction rerun failed"
+        await session.commit()
+        logger.exception("Document %s failed during extraction rerun", doc_id)
+        raise HTTPException(status_code=500, detail=document.failure_reason) from exc
     result = await session.execute(
         select(Extraction).where(Extraction.document_id == doc_id).order_by(Extraction.schema_field_key)
     )

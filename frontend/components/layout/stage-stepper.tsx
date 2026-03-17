@@ -102,7 +102,7 @@ export function StageStepper() {
   }, [caseId]);
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+    <div className="rounded-xl border border-[#4a1530] bg-[#1f0d16] p-4 shadow-sm">
       <div className="overflow-x-auto">
         <div className="flex min-w-[720px] items-start justify-between gap-3">
           {STAGES.map((stage, index) => {
@@ -111,11 +111,11 @@ export function StageStepper() {
             const completed = index < progressStageIndex;
             const locked = !active && !completed && index > progressStageIndex;
             const circleClass = active
-              ? "bg-blue-600 text-white"
+              ? "bg-[#e91e8c] text-[#fce4ec]"
               : completed
-                ? "bg-emerald-500 text-white"
-                : "bg-slate-300 text-slate-400";
-            const labelClass = active ? "text-slate-900" : completed ? "text-slate-800" : "text-slate-500";
+                ? "bg-[#8b2252] text-[#fce4ec]"
+                : "bg-[#3d1a2a] text-[#ad6883]";
+            const labelClass = active || completed ? "text-[#fce4ec]" : "text-[#ad6883]";
 
             const content = (
               <div className="flex flex-1 items-start">
@@ -135,14 +135,14 @@ export function StageStepper() {
                     )}
                   </div>
                   <p className={cn("mt-3 text-sm font-semibold transition-all duration-300", labelClass)}>{stage.label}</p>
-                  <p className="mt-1 text-xs text-slate-500">{stage.description}</p>
+                  <p className="mt-1 text-xs text-[#ad6883]">{stage.description}</p>
                 </div>
                 {index < STAGES.length - 1 ? (
                   <div className="mt-5 flex-1 px-2">
                     <div
                       className={cn(
                         "h-1 rounded-full transition-all duration-300",
-                        completed && index + 1 <= progressStageIndex ? "bg-emerald-400" : "bg-slate-200",
+                        completed && index + 1 <= progressStageIndex ? "bg-[#e91e8c]" : "bg-[#4a1530]",
                       )}
                     />
                   </div>

@@ -8,12 +8,12 @@ type Props = {
 };
 
 const tones = {
-  default: "border-accent/20 bg-accent/[0.12] text-accent-glow",
-  success: "border-emerald/20 bg-emerald/[0.12] text-emerald-glow",
-  warn: "border-gold/20 bg-gold/[0.12] text-gold-glow",
-  danger: "border-rose/20 bg-rose/[0.12] text-rose-glow",
-  info: "border-blue-400/20 bg-blue-400/[0.12] text-blue-200",
-  neutral: "border-white/[0.1] bg-white/[0.05] text-slate",
+  default: "border-[#e91e8c]/30 bg-[#e91e8c]/15 text-[#ff6bb5]",
+  success: "border-green-800 bg-green-950 text-green-300",
+  warn: "border-amber-800 bg-amber-950 text-amber-300",
+  danger: "border-red-800 bg-red-950 text-red-300",
+  info: "border-[#7a2550] bg-[#3d1a2a] text-[#ff6bb5]",
+  neutral: "border-[#4a1530] bg-[#1f0d16] text-[#f48fb1]",
 };
 
 export function Badge({ children, tone = "default", className, pulse }: Props) {

@@ -6,14 +6,14 @@ export function DownloadButtons({ reportId }: { reportId: string }) {
       <a
         href={getReportDownloadUrl(reportId, "docx")}
         download
-        className="rounded-lg bg-blue-600 px-4 py-2 font-medium text-white transition-colors hover:bg-blue-700"
+        className="rounded-lg bg-[#e91e8c] px-4 py-2 font-medium text-white transition-colors hover:bg-[#c4187a]"
       >
         Download CAM Report
       </a>
       <a
         href={getReportDownloadUrl(reportId, "pdf")}
         download
-        className="rounded-lg border border-slate-300 bg-white px-4 py-2 font-medium text-slate-700 transition-colors hover:bg-slate-50"
+        className="rounded-lg border border-[#7a2550] bg-[#3d1a2a] px-4 py-2 font-medium text-[#f48fb1] transition-colors hover:bg-[#4a1530]"
       >
         Download PDF
       </a>

@@ -10,18 +10,32 @@ const config: Config = {
     extend: {
       colors: {
         surface: {
-          DEFAULT: "#09111f",
-          50: "#0f182b",
-          100: "#142038",
-          200: "#1b2a46",
-          300: "#243658",
-          400: "#2d436a",
+          DEFAULT: "#1a0a0f",
+          50: "#1f0d16",
+          100: "#2d1420",
+          200: "#3d1a2a",
+          300: "#4a1530",
+          400: "#7a2550",
         },
         accent: {
-          DEFAULT: "#4f7cff",
-          dim: "#3b63d9",
-          glow: "#9cb8ff",
-          50: "#edf3ff",
+          DEFAULT: "#e91e8c",
+          dim: "#c4187a",
+          glow: "#ff6bb5",
+          50: "#fce4ec",
+        },
+        brand: {
+          950: "#1a0a0f",
+          900: "#2d1420",
+          800: "#3d1a2a",
+          700: "#4a1530",
+          600: "#7a2550",
+          500: "#8b2252",
+          400: "#ad6883",
+          300: "#f48fb1",
+          200: "#ff6bb5",
+          100: "#fce4ec",
+          DEFAULT: "#e91e8c",
+          hover: "#c4187a",
         },
         gold: {
           DEFAULT: "#d6a655",
@@ -39,10 +53,10 @@ const config: Config = {
           glow: "#f19aaa",
         },
         slate: {
-          DEFAULT: "#9aa7c2",
-          dim: "#72809b",
-          bright: "#e7eefb",
-          50: "#f7f9fd",
+          DEFAULT: "#f48fb1",
+          dim: "#ad6883",
+          bright: "#fce4ec",
+          50: "#1f0d16",
         },
       },
       fontFamily: {
@@ -50,17 +64,17 @@ const config: Config = {
         serif: ["var(--font-fraunces)"],
       },
       boxShadow: {
-        glow: "0 18px 42px rgba(79, 124, 255, 0.2)",
+        glow: "0 18px 42px rgba(233, 30, 140, 0.22)",
         "glow-gold": "0 18px 42px rgba(214, 166, 85, 0.18)",
         "glow-emerald": "0 18px 42px rgba(34, 176, 125, 0.16)",
         "glow-rose": "0 18px 42px rgba(216, 90, 113, 0.18)",
-        panel: "0 28px 72px rgba(3, 10, 24, 0.44)",
-        card: "0 12px 36px rgba(5, 12, 30, 0.22)",
+        panel: "0 28px 72px rgba(26, 8, 16, 0.5)",
+        card: "0 12px 36px rgba(26, 8, 16, 0.32)",
       },
       backgroundImage: {
         "gradient-radial": "radial-gradient(var(--tw-gradient-stops))",
         "mesh-gradient":
-          "radial-gradient(at 18% 18%, rgba(79, 124, 255, 0.16) 0px, transparent 42%), radial-gradient(at 82% 0%, rgba(34, 176, 125, 0.12) 0px, transparent 40%), radial-gradient(at 50% 100%, rgba(214, 166, 85, 0.08) 0px, transparent 48%)",
+          "radial-gradient(at 18% 18%, rgba(233, 30, 140, 0.16) 0px, transparent 42%), radial-gradient(at 82% 0%, rgba(255, 107, 181, 0.12) 0px, transparent 40%), radial-gradient(at 50% 100%, rgba(139, 34, 82, 0.12) 0px, transparent 48%)",
       },
       animation: {
         "fade-in": "fadeIn 0.5s ease-out forwards",
@@ -88,8 +102,8 @@ const config: Config = {
           "50%": { opacity: "0.7" },
         },
         glowPulse: {
-          "0%, 100%": { boxShadow: "0 0 18px rgba(79, 124, 255, 0.22)" },
-          "50%": { boxShadow: "0 0 30px rgba(79, 124, 255, 0.34)" },
+          "0%, 100%": { boxShadow: "0 0 18px rgba(233, 30, 140, 0.22)" },
+          "50%": { boxShadow: "0 0 30px rgba(233, 30, 140, 0.34)" },
         },
         shimmer: {
           "0%": { backgroundPosition: "-200% 0" },

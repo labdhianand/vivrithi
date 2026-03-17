@@ -12,7 +12,13 @@ from ..models.case import Case
 from ..models.document import Document
 from ..models.extraction import Extraction
 from ..models.page import Page
-from .runtime import FastDocumentPipeline, get_docling_remote_backend, parsed_pages_from_remote_payload
+from .runtime import FastDocumentPipeline
+from .runtime.docling_remote import (
+    build_pdfplumber_payload_sync,
+    convert_pdf_to_markdown,
+    get_first_page_text,
+    parsed_pages_from_remote_payload,
+)
 from .classifier import classify_document
 from .extractor import extract_with_schema
 from .markdown_builder import build_document_markdown
@@ -220,16 +226,15 @@ async def _process_document_docling_remote(session: AsyncSession, case: Case, do
     source_path = storage.absolute_path(document.stored_path)
     await _reset_document_outputs(session, document.id)
 
-    remote_backend = get_docling_remote_backend()
-    remote_result = await remote_backend.convert(source_path)
-    parsed_pages = parsed_pages_from_remote_payload(remote_result.payload)
+    conversion = await convert_pdf_to_markdown(str(source_path))
+    payload = build_pdfplumber_payload_sync(str(source_path), conversion)
+    parsed_pages = parsed_pages_from_remote_payload(payload)
+    if not parsed_pages and not (conversion.get("markdown") or "").strip():
+        raise ValueError(f"No text could be extracted from {document.original_filename}")
 
     page_models_by_number: dict[int, Page] = {}
     page_signal_counts: Counter[str] = Counter()
-    page_duration_ms = int(
-        round((remote_result.convert_seconds / max(len(parsed_pages), 1)) * 1000)
-    )
-    document.total_pages = len(parsed_pages)
+    document.total_pages = int(payload.get("page_count") or len(parsed_pages))
     await session.commit()
     for parsed_page in parsed_pages:
         has_tables = bool(parsed_page.tables)
@@ -242,23 +247,27 @@ async def _process_document_docling_remote(session: AsyncSession, case: Case, do
             is_scanned=is_scanned,
             has_tables=has_tables,
             content_type=content_type,
-            parser_used=parsed_page.parser_used or remote_result.payload.get("backend") or "docling_gpu_remote",
+            parser_used=parsed_page.parser_used or conversion.get("method") or "pdfplumber",
             raw_text=parsed_page.text,
             raw_markdown=parsed_page.markdown,
             page_image_path=None,
-            parsing_confidence=Decimal("0.9400"),
-            parsing_duration_ms=page_duration_ms,
+            parsing_confidence=Decimal(str(round(parsed_page.confidence, 4))),
+            parsing_duration_ms=0,
         )
         session.add(page_model)
         await session.flush()
         page_models_by_number[parsed_page.page_number] = page_model
 
-    document.raw_markdown = remote_result.markdown or build_document_markdown(parsed_pages)
-    first_pages_markdown = "\n\n".join(page.markdown for page in parsed_pages[:3])
+    document.raw_markdown = (
+        conversion.get("markdown")
+        or payload.get("markdown")
+        or build_document_markdown(parsed_pages)
+    )
     document.processing_status = "classifying"
     await session.commit()
+    first_page_text = await get_first_page_text(str(source_path))
     classification = await classify_document(
-        first_pages_markdown or document.raw_markdown or "",
+        first_page_text or document.raw_markdown or "",
         filename=document.original_filename,
         page_signal_counts=dict(page_signal_counts),
     )
@@ -385,12 +394,12 @@ async def process_document(
     if suffix in IMAGE_EXTENSIONS:
         return await _process_document_image(session, case, document)
 
-    selected_backend = (backend or get_settings().document_processing_backend).strip().lower()
-    if selected_backend in {"legacy", "classic"}:
-        return await _process_document_legacy(session, case, document)
-    if selected_backend in {"fast", "fast_runtime"}:
-        return await _process_document_fast(session, case, document)
+    selected_backend = (backend or get_settings().document_processing_backend or "docling_remote").strip().lower()
     if selected_backend in {
+        "legacy",
+        "classic",
+        "fast",
+        "fast_runtime",
         "docling",
         "docling_remote",
         "docling_gpu",
@@ -398,6 +407,7 @@ async def process_document(
         "marker",
         "marker_api",
         "marker_remote",
+        "pdfplumber",
     }:
         return await _process_document_docling_remote(session, case, document)
     raise ValueError(f"Unsupported document processing backend: {selected_backend}")

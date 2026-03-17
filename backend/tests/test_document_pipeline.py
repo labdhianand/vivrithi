@@ -13,7 +13,7 @@ from backend.app.models.extraction import Extraction
 from backend.app.models.page import Page
 from backend.app.services.document_pipeline import _normalize_bbox, process_document
 from backend.app.services.storage import storage
-from backend.app.services.types import ClassificationResult, ExtractionResult
+from backend.app.services.types import ClassificationResult, ExtractionResult, ParsedPage, ParsedTable
 
 
 def test_normalize_bbox_pads_short_tuples() -> None:
@@ -105,35 +105,35 @@ def test_process_document_docling_remote_persists_pages_and_extractions(tmp_path
         absolute_path.parent.mkdir(parents=True, exist_ok=True)
         absolute_path.write_text("metric,value\nGNPA,1.8%\n", encoding="utf-8")
 
-        class FakeRemoteBackend:
-            async def convert(self, source_path: Path):
-                return type(
-                    "RemoteResult",
-                    (),
-                    {
-                        "payload": {
-                            "pages": [
-                                    {
-                                        "page_number": 1,
-                                        "text": "Statement of Profit and Loss\nGross NPA 1.8%",
-                                        "markdown": "Statement of Profit and Loss\n\nGross NPA 1.8%",
-                                        "tables": [
-                                            {
-                                                "bbox": [0.1, 0.2, 0.5, 0.3],
-                                                "rows": [["Metric", "Value"], ["GNPA", "1.8%"]],
-                                                "markdown": "| Metric | Value |\n| --- | --- |\n| GNPA | 1.8% |",
-                                            }
-                                        ],
-                                        "bounding_boxes": [
-                                            {"text": "Gross NPA 1.8%", "bbox": [0.1, 0.2, 0.5, 0.3]},
-                                        ],
-                                    }
-                            ]
-                        },
-                        "markdown": "Statement of Profit and Loss\n\nGross NPA 1.8%",
-                        "convert_seconds": 1.25,
-                    },
-                )()
+        async def fake_convert_pdf_to_markdown(_: str):
+            return {
+                "markdown": "Statement of Profit and Loss\n\nGross NPA 1.8%",
+                "method": "pdfplumber",
+                "success": True,
+                "pages": 1,
+                "metadata": {"table_count": 1, "parsed_page_count": 1},
+                "error": None,
+                "parsed_pages": [
+                    ParsedPage(
+                        page_number=1,
+                        text="Statement of Profit and Loss\nGross NPA 1.8%",
+                        markdown="Statement of Profit and Loss\n\nGross NPA 1.8%",
+                        tables=[
+                            ParsedTable(
+                                bbox=(0.1, 0.2, 0.5, 0.3),
+                                rows=[["Metric", "Value"], ["GNPA", "1.8%"]],
+                                markdown="| Metric | Value |\n| --- | --- |\n| GNPA | 1.8% |",
+                            )
+                        ],
+                        bounding_boxes=[{"text": "Gross NPA 1.8%", "bbox": [0.1, 0.2, 0.5, 0.3]}],
+                        parser_used="pdfplumber",
+                        confidence=0.84,
+                    )
+                ],
+            }
+
+        async def fake_get_first_page_text(_: str) -> str:
+            return "Statement of Profit and Loss\nGross NPA 1.8%"
 
         async def fake_classify_document(*args, **kwargs):
             return ClassificationResult(
@@ -163,8 +163,12 @@ def test_process_document_docling_remote_persists_pages_and_extractions(tmp_path
             ]
 
         monkeypatch.setattr(
-            "backend.app.services.document_pipeline.get_docling_remote_backend",
-            lambda: FakeRemoteBackend(),
+            "backend.app.services.document_pipeline.convert_pdf_to_markdown",
+            fake_convert_pdf_to_markdown,
+        )
+        monkeypatch.setattr(
+            "backend.app.services.document_pipeline.get_first_page_text",
+            fake_get_first_page_text,
         )
         monkeypatch.setattr(
             "backend.app.services.document_pipeline.classify_document",
@@ -212,7 +216,7 @@ def test_process_document_docling_remote_persists_pages_and_extractions(tmp_path
             assert processed.processing_status == "extracted"
             assert processed.total_pages == 1
             assert len(pages) == 1
-            assert pages[0].parser_used == "docling_gpu_remote"
+            assert pages[0].parser_used == "pdfplumber"
             assert pages[0].content_type == "financial_table"
             assert len(extractions) == 1
             assert extractions[0].schema_field_key == "gnpa_percent"

@@ -10,13 +10,13 @@ from .docling_remote import check_marker_health
 async def convert_document(_: argparse.Namespace | None = None) -> dict:
     healthy = await check_marker_health()
     return {
-        "backend": "marker_api",
+        "backend": "pdfplumber",
         "healthy": healthy,
     }
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Check Marker API health.")
+    parser = argparse.ArgumentParser(description="Check local pdfplumber parser health.")
     return parser.parse_args()
 
 

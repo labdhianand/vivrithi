@@ -19,7 +19,7 @@ export function CaseNav({ caseId }: { caseId: string }) {
   const pathname = usePathname();
 
   return (
-    <div className="panel flex flex-wrap gap-1.5 p-2">
+    <div className="flex flex-wrap gap-1.5 rounded-[20px] border border-[#4a1530] bg-[#1f0d16] p-2">
       {tabs.map((tab) => {
         const href = `/cases/${caseId}${tab.suffix}`;
         const active = pathname === href || pathname.startsWith(`${href}/`);
@@ -30,8 +30,8 @@ export function CaseNav({ caseId }: { caseId: string }) {
             className={cn(
               "rounded-xl px-3.5 py-2 text-xs font-semibold uppercase tracking-[0.12em] transition-all duration-200",
               active
-                ? "border border-white/[0.14] bg-white/[0.08] text-slate-bright"
-                : "text-slate-dim hover:bg-white/[0.05] hover:text-slate-bright",
+                ? "border border-[#7a2550] bg-[#3d1a2a] text-[#e91e8c]"
+                : "text-[#ad6883] hover:bg-[#2d1420] hover:text-[#f48fb1]",
             )}
           >
             {tab.label}

@@ -4,20 +4,31 @@
 
 :root {
   color-scheme: dark;
-  --accent: #4f7cff;
-  --surface: #09111f;
+  --background: #1a0a0f;
+  --foreground: #fce4ec;
+  --card: #1f0d16;
+  --primary: #e91e8c;
+  --secondary: #ff6bb5;
+  --muted: #ad6883;
+  --border: #4a1530;
+  --ring: #e91e8c;
+  --destructive: #f44336;
+  --warning: #ff9800;
+  --success: #4caf50;
 }
 
 html {
-  background: #09111f;
+  background: var(--background);
 }
 
 body {
-  @apply min-h-screen bg-surface font-sans text-slate-bright antialiased;
+  @apply min-h-screen font-sans antialiased;
+  background-color: var(--background);
+  color: var(--foreground);
   background-image:
-    radial-gradient(at 18% 18%, rgba(79, 124, 255, 0.14) 0px, transparent 44%),
-    radial-gradient(at 82% 0%, rgba(34, 176, 125, 0.1) 0px, transparent 42%),
-    radial-gradient(at 50% 100%, rgba(214, 166, 85, 0.08) 0px, transparent 50%);
+    radial-gradient(at 16% 14%, rgba(233, 30, 140, 0.18) 0px, transparent 40%),
+    radial-gradient(at 82% 0%, rgba(255, 107, 181, 0.12) 0px, transparent 38%),
+    radial-gradient(at 54% 100%, rgba(139, 34, 82, 0.14) 0px, transparent 48%);
   background-attachment: fixed;
   letter-spacing: -0.01em;
 }
@@ -46,44 +57,44 @@ a {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(114, 128, 155, 0.28);
+  background: rgba(122, 37, 80, 0.5);
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(156, 184, 255, 0.34);
+  background: rgba(233, 30, 140, 0.55);
 }
 
 /* Glass panel */
 .panel {
-  @apply rounded-[24px] border border-white/[0.08] shadow-card backdrop-blur-2xl;
-  background-color: rgba(20, 32, 56, 0.82);
+  @apply rounded-[24px] border border-[#4a1530] shadow-card backdrop-blur-2xl;
+  background-color: rgba(31, 13, 22, 0.9);
 }
 
 .panel-glow {
   @apply panel;
   box-shadow:
-    0 20px 48px rgba(2, 9, 24, 0.34),
-    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    0 20px 48px rgba(42, 10, 23, 0.38),
+    inset 0 1px 0 rgba(252, 228, 236, 0.05);
 }
 
 /* Subtle grid background */
 .gridlines {
   background-image:
-    linear-gradient(rgba(148, 163, 184, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(148, 163, 184, 0.03) 1px, transparent 1px);
+    linear-gradient(rgba(173, 104, 131, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(173, 104, 131, 0.05) 1px, transparent 1px);
   background-size: 32px 32px;
 }
 
 /* Gradient text */
 .text-gradient {
-  background: linear-gradient(135deg, #7aa0ff 0%, #c6d6ff 48%, #75d3ad 100%);
+  background: linear-gradient(135deg, #ff6bb5 0%, #fce4ec 48%, #e91e8c 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
 
 .text-gradient-gold {
-  background: linear-gradient(135deg, #c89444 0%, #f0cb85 55%, #f7e0b6 100%);
+  background: linear-gradient(135deg, #f48fb1 0%, #fce4ec 55%, #ff6bb5 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -99,7 +110,7 @@ a {
   inset: 0;
   border-radius: inherit;
   padding: 1px;
-  background: linear-gradient(135deg, rgba(79, 124, 255, 0.32), transparent 52%, rgba(214, 166, 85, 0.22));
+  background: linear-gradient(135deg, rgba(233, 30, 140, 0.32), transparent 52%, rgba(255, 107, 181, 0.22));
   -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
@@ -127,10 +138,10 @@ a {
 /* Focus ring */
 input:focus, select:focus, textarea:focus, button:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px rgba(79, 124, 255, 0.38);
+  box-shadow: 0 0 0 2px rgba(233, 30, 140, 0.38);
 }
 
 ::selection {
-  background: rgba(79, 124, 255, 0.28);
-  color: #f8fbff;
+  background: rgba(233, 30, 140, 0.28);
+  color: #fce4ec;
 }

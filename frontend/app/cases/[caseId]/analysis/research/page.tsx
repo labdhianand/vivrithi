@@ -43,11 +43,11 @@ function bucketItems(items: ResearchItem[]) {
 
 function SkeletonSection() {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-      <div className="h-4 w-32 animate-pulse rounded bg-slate-200" />
+    <div className="rounded-xl border border-[#4a1530] bg-[#1f0d16] p-5 shadow-card">
+      <div className="h-4 w-32 animate-pulse rounded bg-[#3d1a2a]" />
       <div className="mt-4 space-y-3">
-        <div className="h-24 animate-pulse rounded-lg bg-slate-100" />
-        <div className="h-24 animate-pulse rounded-lg bg-slate-100" />
+        <div className="h-24 animate-pulse rounded-lg bg-[#2d1420]" />
+        <div className="h-24 animate-pulse rounded-lg bg-[#2d1420]" />
       </div>
     </div>
   );
@@ -79,11 +79,11 @@ export default function ResearchPage({ params }: { params: { caseId: string } })
   const buckets = useMemo(() => bucketItems(items), [items]);
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-8">
+    <div className="mx-auto max-w-5xl px-4 py-8 text-[#fce4ec]">
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Research Findings</h1>
-          <p className="mt-1 text-slate-500">Firecrawl-only research grouped into the five appraisal categories.</p>
+          <h1 className="text-2xl font-bold text-[#fce4ec]">Research Findings</h1>
+          <p className="mt-1 text-[#ad6883]">Firecrawl-only research grouped into the five appraisal categories.</p>
         </div>
         <button
           type="button"
@@ -99,7 +99,7 @@ export default function ResearchPage({ params }: { params: { caseId: string } })
               setRunning(false);
             }
           }}
-          className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
+          className="inline-flex items-center gap-2 rounded-lg bg-[#e91e8c] px-4 py-2 font-medium text-white transition-colors hover:bg-[#c4187a] disabled:opacity-50"
         >
           {running ? (
             <>
@@ -127,13 +127,13 @@ export default function ResearchPage({ params }: { params: { caseId: string } })
           {SECTIONS.map((section) => {
             const sectionItems = buckets[section.key];
             return (
-              <section key={section.key} className="rounded-xl border border-slate-200 bg-slate-50 p-5">
-                <h2 className="text-xl font-semibold text-slate-900">{section.label}</h2>
+              <section key={section.key} className="rounded-xl border border-[#4a1530] bg-[#1f0d16] p-5 shadow-card">
+                <h2 className="text-xl font-semibold text-[#fce4ec]">{section.label}</h2>
                 <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                   {sectionItems.length > 0 ? (
                     sectionItems.slice(0, 3).map((item) => <ResearchCard key={item.id} item={item} />)
                   ) : (
-                    <div className="rounded-xl border border-slate-200 bg-white p-5 text-sm text-slate-500 shadow-sm">
+                    <div className="rounded-xl border border-[#4a1530] bg-[#2d1420] p-5 text-sm text-[#ad6883] shadow-card">
                       No Firecrawl findings available for this section yet.
                     </div>
                   )}

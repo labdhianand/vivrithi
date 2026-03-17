@@ -10,7 +10,7 @@ export default function CaseLayout({
   params: { caseId: string };
 }) {
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 rounded-[28px] border border-[#4a1530] bg-[#1a0a0f]/45 p-4 sm:p-5">
       <div className="animate-slide-up">
         <CaseNav caseId={params.caseId} />
       </div>

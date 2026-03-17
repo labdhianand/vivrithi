@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import type { ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
 
@@ -11,7 +12,7 @@ const links = [
   { href: "/cases", label: "Case Pipeline", icon: "layers" },
 ];
 
-const icons: Record<string, React.ReactNode> = {
+const icons: Record<string, ReactNode> = {
   grid: (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
       <rect x="1" y="1" width="6" height="6" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
@@ -38,25 +39,24 @@ export function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="sticky top-5 flex h-[calc(100vh-2.5rem)] min-w-[260px] max-w-[260px] flex-col gap-6 overflow-hidden rounded-[28px] border border-white/[0.08] bg-surface-50/[0.88] p-5 shadow-panel backdrop-blur-2xl">
-      {/* Brand */}
+    <aside className="sticky top-5 flex h-[calc(100vh-2.5rem)] min-w-[260px] max-w-[260px] flex-col gap-6 overflow-hidden rounded-[28px] border border-[#4a1530] bg-[#1f0d16] p-5 shadow-panel backdrop-blur-2xl">
       <div>
         <div className="mb-4 flex items-center gap-2.5">
-          <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/[0.08] bg-white/[0.05]">
+          <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-[#4a1530] bg-[#2d1420] text-[#e91e8c]">
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-              <path d="M9 1L16 5v8l-7 4-7-4V5l7-4z" stroke="#7AA0FF" strokeWidth="1.5" strokeLinejoin="round" />
-              <path d="M9 9v8M9 9l7-4M9 9L2 5" stroke="#7AA0FF" strokeWidth="1.5" />
+              <path d="M9 1L16 5v8l-7 4-7-4V5l7-4z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+              <path d="M9 9v8M9 9l7-4M9 9L2 5" stroke="currentColor" strokeWidth="1.5" />
             </svg>
           </div>
-          <span className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-bright/[0.78]">Intelli-Credit</span>
+          <span className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f48fb1]">Intelli-Credit</span>
         </div>
-        <h1 className="font-serif text-[28px] leading-[1.05] text-slate-bright">
-          Credit Decisioning<br />
+        <h1 className="font-serif text-[28px] leading-[1.05] text-[#fce4ec]">
+          Credit Decisioning
+          <br />
           <span className="text-gradient">Engine</span>
         </h1>
       </div>
 
-      {/* Navigation */}
       <nav className="flex flex-col gap-1.5">
         {links.map((link) => {
           const active = pathname === link.href || (link.href !== "/" && pathname.startsWith(`${link.href}/`));
@@ -67,37 +67,30 @@ export function Sidebar() {
               className={cn(
                 "flex items-center gap-3 rounded-2xl px-3.5 py-2.5 text-sm transition-all duration-200",
                 active
-                  ? "border border-white/[0.14] bg-white/[0.08] font-medium text-slate-bright"
-                  : "text-slate hover:bg-white/[0.05] hover:text-slate-bright",
+                  ? "border border-[#7a2550] bg-[#3d1a2a] font-medium text-[#e91e8c]"
+                  : "text-[#ad6883] hover:bg-[#2d1420] hover:text-[#f48fb1]",
               )}
             >
-              <span className={cn("transition-colors", active ? "text-accent-glow" : "text-slate-dim")}>
-                {icons[link.icon]}
-              </span>
+              <span className={cn("transition-colors", active ? "text-[#e91e8c]" : "text-[#ad6883]")}>{icons[link.icon]}</span>
               {link.label}
             </Link>
           );
         })}
       </nav>
 
-      {/* Spacer */}
       <div className="flex-1" />
 
-      {/* Signal panel */}
-      <div className="rounded-[22px] border border-white/[0.08] bg-gradient-to-br from-white/[0.06] to-accent/10 p-4">
-        <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.25em] text-accent-glow/80">
-          <span className="h-1.5 w-1.5 rounded-full bg-accent animate-glow-pulse" />
+      <div className="rounded-[22px] border border-[#4a1530] bg-gradient-to-br from-[#2d1420] to-[#3d1a2a] p-4">
+        <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.25em] text-[#ff6bb5]">
+          <span className="h-1.5 w-1.5 rounded-full bg-[#e91e8c] animate-glow-pulse" />
           AI Engine Active
         </div>
-        <p className="mt-2.5 text-[13px] leading-relaxed text-slate-dim/95">
+        <p className="mt-2.5 text-[13px] leading-relaxed text-[#ad6883]">
           Trace extracted values to source pages, auto-score with ML, and generate investment-grade CAMs.
         </p>
       </div>
 
-      {/* Version */}
-      <div className="text-[10px] font-medium uppercase tracking-[0.18em] text-slate-dim/50">
-        v1.0 &middot; Powered by Gemini + GBM
-      </div>
+      <div className="text-[10px] font-medium uppercase tracking-[0.18em] text-[#ad6883]">v1.0 · Powered by Gemini + GBM</div>
     </aside>
   );
 }

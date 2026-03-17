@@ -134,7 +134,7 @@ export function RecommendationPanel({
           </div>
 
           {/* Decision reasoning */}
-          <div className="mt-6 rounded-xl border border-white/[0.04] bg-surface-200/40 p-4">
+          <div className="mt-6 rounded-xl border border-[#4a1530] bg-[#2d1420]/70 p-4">
             <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-dim">
               Decision Rationale
             </div>
@@ -213,8 +213,8 @@ export function RecommendationPanel({
       {/* ============================================================ */}
       <div className="grid gap-4 md:grid-cols-2">
         {/* Strengths */}
-        <div className="panel stagger-4 animate-slide-up overflow-hidden border-t-2 border-t-emerald p-0">
-          <div className="flex items-center gap-3 border-b border-white/[0.04] bg-emerald/[0.04] px-5 py-3.5">
+        <div className="panel stagger-4 animate-slide-up overflow-hidden border border-[#4a1530] border-t-2 border-t-emerald p-0">
+          <div className="flex items-center gap-3 border-b border-[#4a1530] bg-emerald/[0.04] px-5 py-3.5">
             <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald/15 text-[11px] font-bold text-emerald-glow">
               <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clipRule="evenodd" />
@@ -229,7 +229,7 @@ export function RecommendationPanel({
             {recommendation.key_strengths.map((item, index) => (
               <div
                 key={`${item.title}-${index}`}
-                className="rounded-xl border border-white/[0.04] bg-emerald/[0.03] p-3.5 transition-colors hover:border-emerald/10"
+                className="rounded-xl border border-[#4a1530] bg-emerald/[0.03] p-3.5 transition-colors hover:border-emerald/20"
               >
                 <div className="flex items-start gap-2.5">
                   <div className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-glow" />
@@ -245,8 +245,8 @@ export function RecommendationPanel({
         </div>
 
         {/* Risks */}
-        <div className="panel stagger-5 animate-slide-up overflow-hidden border-t-2 border-t-rose p-0">
-          <div className="flex items-center gap-3 border-b border-white/[0.04] bg-rose/[0.04] px-5 py-3.5">
+        <div className="panel stagger-5 animate-slide-up overflow-hidden border border-[#4a1530] border-t-2 border-t-rose p-0">
+          <div className="flex items-center gap-3 border-b border-[#4a1530] bg-rose/[0.04] px-5 py-3.5">
             <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-rose/15 text-[11px] font-bold text-rose-glow">
               <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
@@ -261,7 +261,7 @@ export function RecommendationPanel({
             {recommendation.key_risks.map((item, index) => (
               <div
                 key={`${item.title}-${index}`}
-                className="rounded-xl border border-white/[0.04] bg-rose/[0.03] p-3.5 transition-colors hover:border-rose/10"
+                className="rounded-xl border border-[#4a1530] bg-rose/[0.03] p-3.5 transition-colors hover:border-rose/20"
               >
                 <div className="flex items-start gap-2.5">
                   <div className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-rose-glow" />
@@ -283,14 +283,14 @@ export function RecommendationPanel({
       {(recommendation.conditions_precedent.length > 0 ||
         recommendation.conditions_subsequent.length > 0 ||
         recommendation.monitoring_covenants.length > 0) && (
-        <div className="panel stagger-6 animate-slide-up p-0">
-          <div className="border-b border-white/[0.04] px-5 py-3.5">
+        <div className="panel stagger-6 animate-slide-up border-[#4a1530] p-0">
+          <div className="border-b border-[#4a1530] px-5 py-3.5">
             <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-dim">
               Conditions &amp; Covenants
             </div>
           </div>
 
-          <div className="grid gap-0 divide-y divide-white/[0.04] md:grid-cols-3 md:divide-x md:divide-y-0">
+          <div className="grid gap-0 divide-y divide-[#4a1530] md:grid-cols-3 md:divide-x md:divide-y-0">
             {/* Conditions Precedent */}
             {recommendation.conditions_precedent.length > 0 && (
               <div className="p-5">
@@ -323,7 +323,7 @@ export function RecommendationPanel({
                 <ul className="space-y-2">
                   {recommendation.conditions_subsequent.map((cs, i) => (
                     <li key={i} className="flex items-start gap-2 text-[12px] leading-relaxed text-slate/90">
-                      <span className="mt-1 block h-1 w-1 shrink-0 rounded-full bg-blue-400/60" />
+                      <span className="mt-1 block h-1 w-1 shrink-0 rounded-full bg-[#ff6bb5]" />
                       {cs}
                     </li>
                   ))}

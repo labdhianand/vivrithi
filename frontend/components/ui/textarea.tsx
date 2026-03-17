@@ -16,9 +16,9 @@ export function Textarea({ className, label, id, ...props }: Props) {
       <textarea
         id={id}
         className={cn(
-          "w-full rounded-xl border border-white/[0.09] bg-white/[0.04] px-3.5 py-2.5 text-sm text-slate-bright",
-          "placeholder:text-slate-dim/70 transition-all duration-200 resize-none",
-          "hover:border-white/[0.14] hover:bg-white/[0.05] focus:border-accent/50 focus:bg-surface-50",
+          "w-full rounded-xl border border-[#4a1530] bg-[#2d1420] px-3.5 py-2.5 text-sm text-[#fce4ec]",
+          "placeholder:text-[#ad6883] transition-colors duration-200 resize-none",
+          "hover:border-[#7a2550] hover:bg-[#2d1420] focus:border-[#e91e8c] focus:bg-[#2d1420] focus:ring-[#e91e8c]",
           className,
         )}
         rows={4}

@@ -66,19 +66,19 @@ export default function ClassificationPage({ params }: { params: { caseId: strin
   const allReviewed = documents.length > 0 && reviewedCount === documents.length;
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-8">
+    <div className="mx-auto max-w-5xl px-4 py-8 text-[#fce4ec]">
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Classification Review</h1>
-          <p className="mt-1 text-slate-500">Approve or reject each uploaded document before moving to schema setup.</p>
+          <h1 className="text-2xl font-bold text-[#fce4ec]">Classification Review</h1>
+          <p className="mt-1 text-[#ad6883]">Approve or reject each uploaded document before moving to schema setup.</p>
         </div>
-        <div className="rounded-full bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700">
+        <div className="rounded-full border border-[#4a1530] bg-[#1f0d16] px-4 py-2 text-sm font-medium text-[#f48fb1]">
           {reviewedCount}/{documents.length} reviewed
         </div>
       </div>
 
       {processing ? (
-        <div className="mb-6 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
+        <div className="mb-6 rounded-lg border border-[#7a2550] bg-[#3d1a2a] px-4 py-3 text-sm text-[#ff6bb5]">
           Documents are still processing. Classification cards will update automatically.
         </div>
       ) : null}
@@ -105,7 +105,7 @@ export default function ClassificationPage({ params }: { params: { caseId: strin
       </div>
 
       {documents.length === 0 ? (
-        <div className="mt-6 rounded-xl border border-slate-200 bg-white p-8 text-center text-slate-500 shadow-sm">
+        <div className="mt-6 rounded-xl border border-[#4a1530] bg-[#1f0d16] p-8 text-center text-[#ad6883] shadow-card">
           No documents uploaded yet.
         </div>
       ) : null}
@@ -115,7 +115,7 @@ export default function ClassificationPage({ params }: { params: { caseId: strin
           <button
             type="button"
             onClick={() => router.push(`/cases/${params.caseId}/schema`)}
-            className="rounded-lg bg-blue-600 px-4 py-2 font-medium text-white transition-colors hover:bg-blue-700"
+            className="rounded-lg bg-[#e91e8c] px-4 py-2 font-medium text-white transition-colors hover:bg-[#c4187a]"
           >
             Proceed to Schema
           </button>

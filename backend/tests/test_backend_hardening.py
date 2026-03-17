@@ -8,6 +8,7 @@ from types import SimpleNamespace
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from backend.app.api import documents as documents_api
 from backend.app.database import Base, get_session
 from backend.app.main import app
 from backend.app.models.case import Case
@@ -114,6 +115,50 @@ def test_retry_failed_document_and_failed_jobs_listing(tmp_path, monkeypatch) ->
         finally:
             app.dependency_overrides.clear()
             await engine.dispose()
+
+    asyncio.run(_run())
+
+
+def test_background_processing_timeout_marks_document_failed(tmp_path, monkeypatch) -> None:
+    async def _run() -> None:
+        db_path = tmp_path / "app.db"
+        engine = create_async_engine(f"sqlite+aiosqlite:///{db_path}")
+        session_factory = async_sessionmaker(bind=engine, expire_on_commit=False, class_=AsyncSession)
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+
+        monkeypatch.setattr(documents_api, "SessionLocal", session_factory)
+        monkeypatch.setattr(documents_api, "DOCUMENT_PROCESSING_TIMEOUT_SECONDS", 0.01)
+
+        async def fake_process_document(*args, **kwargs):
+            await asyncio.sleep(0.05)
+            return None
+
+        monkeypatch.setattr(documents_api, "process_document", fake_process_document)
+
+        async with session_factory() as session:
+            case = Case(id="case-timeout", company_name="Timeout Co")
+            document = Document(
+                id="doc-timeout",
+                case_id=case.id,
+                original_filename="slow.pdf",
+                stored_path="cases/case-timeout/documents/doc-timeout/slow.pdf",
+                processing_status="queued",
+                classification_status="pending",
+            )
+            session.add(case)
+            session.add(document)
+            await session.commit()
+
+        await documents_api._process_document_task("case-timeout", "doc-timeout", "docling_remote")
+
+        async with session_factory() as session:
+            refreshed = await session.get(Document, "doc-timeout")
+            assert refreshed is not None
+            assert refreshed.processing_status == "failed"
+            assert refreshed.failure_reason == "Processing timed out after 0.01 seconds"
+
+        await engine.dispose()
 
     asyncio.run(_run())
 

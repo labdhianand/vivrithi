@@ -25,8 +25,7 @@ export function ScoreCard({ label, score, caseId }: { label: string; score: CSco
   const colors = barColor(score.score);
 
   return (
-    <div className="panel animate-slide-up p-5">
-      {/* Header row */}
+    <div className="panel animate-slide-up border-[#4a1530] bg-[#1f0d16] p-5">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-dim">
@@ -42,40 +41,35 @@ export function ScoreCard({ label, score, caseId }: { label: string; score: CSco
       </div>
 
       {/* Progress bar */}
-      <div className="mt-4">
-        <div className="relative h-2 w-full overflow-hidden rounded-full bg-surface-300/60">
-          {/* Glow layer */}
-          <div
-            className="absolute inset-y-0 left-0 rounded-full blur-sm"
-            style={{
-              width: `${score.score}%`,
-              backgroundColor: colors.glow,
-              opacity: 0.4,
-            }}
-          />
-          {/* Main bar */}
-          <div
-            className="relative h-full rounded-full transition-all duration-700 ease-out"
-            style={{
-              width: `${score.score}%`,
-              background: `linear-gradient(90deg, ${colors.bar}, ${colors.glow})`,
-            }}
-          />
+        <div className="mt-4">
+          <div className="relative h-2 w-full overflow-hidden rounded-full bg-surface-300/60">
+            <div
+              className="absolute inset-y-0 left-0 rounded-full blur-sm"
+              style={{
+                width: `${score.score}%`,
+                backgroundColor: colors.glow,
+                opacity: 0.4,
+              }}
+            />
+            <div
+              className="relative h-full rounded-full transition-all duration-700 ease-out"
+              style={{
+                width: `${score.score}%`,
+                background: `linear-gradient(90deg, ${colors.bar}, ${colors.glow})`,
+              }}
+            />
+          </div>
+          <div className="mt-1.5 flex justify-between px-0.5">
+            {[0, 25, 50, 75, 100].map((tick) => (
+              <span key={tick} className="text-[8px] tabular-nums text-slate-dim/60">
+                {tick}
+              </span>
+            ))}
+          </div>
         </div>
-        {/* Tick marks */}
-        <div className="mt-1.5 flex justify-between px-0.5">
-          {[0, 25, 50, 75, 100].map((tick) => (
-            <span key={tick} className="text-[8px] tabular-nums text-slate-dim/60">
-              {tick}
-            </span>
-          ))}
-        </div>
-      </div>
 
-      {/* Summary */}
       <p className="mt-3 text-[13px] leading-relaxed text-slate">{score.summary}</p>
 
-      {/* Factors */}
       <div className="mt-4 space-y-1.5">
         <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-dim">
           Signals
@@ -89,10 +83,9 @@ export function ScoreCard({ label, score, caseId }: { label: string; score: CSco
               key={`${factor.signal}-${index}`}
               type="button"
               onClick={() => setExpandedIdx(isExpanded ? null : index)}
-              className="group w-full cursor-pointer rounded-xl border border-white/[0.04] bg-surface-200/50 px-3.5 py-2.5 text-left transition-colors hover:border-white/[0.08] hover:bg-surface-200/80"
+              className="group w-full cursor-pointer rounded-xl border border-[#4a1530] bg-[#2d1420]/70 px-3.5 py-2.5 text-left transition-colors hover:border-[#7a2550] hover:bg-[#2d1420]"
             >
               <div className="flex items-start gap-2.5">
-                {/* Impact indicator */}
                 <div
                   className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-[11px] font-bold"
                   style={{
@@ -104,12 +97,10 @@ export function ScoreCard({ label, score, caseId }: { label: string; score: CSco
                 >
                   {isPositive ? "+" : "\u2212"}
                 </div>
-                {/* Signal text */}
                 <div className="min-w-0 flex-1">
                   <div className="text-[13px] font-medium text-slate-bright">
                     {factor.signal}
                   </div>
-                  {/* Expanded evidence */}
                   {isExpanded && (
                     <div className="mt-1.5 animate-fade-in">
                       <div className="text-[12px] leading-relaxed text-slate/80">
@@ -119,7 +110,6 @@ export function ScoreCard({ label, score, caseId }: { label: string; score: CSco
                     </div>
                   )}
                 </div>
-                {/* Expand chevron */}
                 <svg
                   className={`mt-1 h-3.5 w-3.5 shrink-0 text-slate-dim transition-transform duration-200 ${
                     isExpanded ? "rotate-180" : ""
