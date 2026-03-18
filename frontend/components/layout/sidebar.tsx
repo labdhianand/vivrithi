@@ -36,7 +36,7 @@ const icons: Record<string, ReactNode> = {
 };
 
 export function Sidebar() {
-  const pathname = usePathname();
+  const pathname = usePathname() ?? "";
 
   return (
     <aside className="sticky top-5 flex h-[calc(100vh-2.5rem)] min-w-[260px] max-w-[260px] flex-col gap-6 overflow-hidden rounded-[28px] border border-[#4a1530] bg-[#1f0d16] p-5 shadow-panel backdrop-blur-2xl">

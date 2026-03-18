@@ -7,7 +7,7 @@ import { Sidebar } from "@/components/layout/sidebar";
 import { StageStepper } from "@/components/layout/stage-stepper";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
+  const pathname = usePathname() ?? "";
   const isFullscreenPage = pathname === "/" || pathname === "/onboarding";
 
   if (isFullscreenPage) {

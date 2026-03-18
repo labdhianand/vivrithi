@@ -16,7 +16,7 @@ const tabs = [
 ];
 
 export function CaseNav({ caseId }: { caseId: string }) {
-  const pathname = usePathname();
+  const pathname = usePathname() ?? "";
 
   return (
     <div className="flex flex-wrap gap-1.5 rounded-[20px] border border-[#4a1530] bg-[#1f0d16] p-2">

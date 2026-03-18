@@ -63,7 +63,7 @@ function getStageHref(stageKey: StageKey, caseId: string | null): string | null 
 }
 
 export function StageStepper() {
-  const pathname = usePathname();
+  const pathname = usePathname() ?? "";
   const [caseRecord, setCaseRecord] = useState<CaseRecord | null>(null);
   const caseId = useMemo(() => getCaseIdFromPath(pathname), [pathname]);
   const activeStage = useMemo(() => getStageFromPath(pathname), [pathname]);

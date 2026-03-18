@@ -3,7 +3,7 @@
 import { usePathname } from "next/navigation";
 
 export function Header() {
-  const pathname = usePathname();
+  const pathname = usePathname() ?? "";
 
   const getTitle = () => {
     if (pathname === "/") return "Command Center";

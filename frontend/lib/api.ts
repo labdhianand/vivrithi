@@ -28,20 +28,40 @@ function buildApiUrl(path: string): string {
   return typeof window === "undefined" ? `${SERVER_API_BASE}${path}` : path;
 }
 
+function parseErrorMessage(message: string, status: number): string {
+  if (!message) {
+    return `Request failed: ${status}`;
+  }
+  try {
+    const parsed = JSON.parse(message) as { detail?: string };
+    if (typeof parsed.detail === "string" && parsed.detail.trim()) {
+      return parsed.detail;
+    }
+  } catch {
+    // Ignore invalid JSON and use the raw message.
+  }
+  return message;
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers);
   if (!(init?.body instanceof FormData) && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
-  const response = await fetch(buildApiUrl(path), {
-    ...init,
-    headers,
-    cache: "no-store",
-  });
+  let response: Response;
+  try {
+    response = await fetch(buildApiUrl(path), {
+      ...init,
+      headers,
+      cache: "no-store",
+    });
+  } catch (error) {
+    throw new Error(error instanceof Error ? error.message : "Network request failed");
+  }
 
   if (!response.ok) {
     const message = await response.text();
-    throw new Error(message || `Request failed: ${response.status}`);
+    throw new Error(parseErrorMessage(message, response.status));
   }
   if (response.status === 204) {
     return undefined as T;
