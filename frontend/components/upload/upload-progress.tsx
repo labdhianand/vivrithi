@@ -9,7 +9,10 @@ function statusTone(status: string): "default" | "success" | "warn" | "danger" |
     case "completed":
       return "success";
     case "processing":
+    case "extracting":
       return "info";
+    case "extraction_failed":
+      return "warn";
     case "failed":
       return "danger";
     case "classified":
@@ -28,7 +31,7 @@ function formatBytes(bytes: number | null | undefined): string {
 
 export function UploadProgress({ documents }: { documents: DocumentRecord[] }) {
   const completedCount = documents.filter(
-    (d) => d.processing_status === "extracted" || d.processing_status === "completed",
+    (d) => d.extraction_status === "extracted" || d.processing_status === "completed",
   ).length;
 
   return (
@@ -92,10 +95,10 @@ export function UploadProgress({ documents }: { documents: DocumentRecord[] }) {
               </div>
             </div>
             <Badge
-              tone={statusTone(document.processing_status)}
-              pulse={document.processing_status === "processing"}
+              tone={statusTone(document.extraction_status || document.processing_status)}
+              pulse={document.extraction_status === "processing" || document.processing_status === "processing"}
             >
-              {document.processing_status}
+              {document.extraction_status || document.processing_status}
             </Badge>
           </div>
         ))}

@@ -10,22 +10,29 @@ class DocumentRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: str
+    doc_id: str
     case_id: str
+    filename: str
     original_filename: str
     stored_path: str
     file_size_bytes: int | None = None
     mime_type: str | None = None
     sha256_hash: str | None = None
+    status: str
     auto_category: str | None = None
     auto_category_confidence: Decimal | None = None
     user_category: str | None = None
+    doc_type: str | None = None
+    confidence: Decimal | None = None
+    reason: str | None = None
     classification_status: str
+    extraction_status: str
     processing_status: str
     failure_reason: str | None = None
+    extracted: bool
     current_stage: str
     progress_percent: int
     total_pages: int | None = None
-    raw_markdown: str | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -57,3 +64,9 @@ class DocumentPageRead(BaseModel):
     parsing_duration_ms: int | None = None
     created_at: datetime
     updated_at: datetime
+
+
+class DocumentExtractionStatusRead(BaseModel):
+    doc_id: str
+    extraction_status: str
+    extracted: bool

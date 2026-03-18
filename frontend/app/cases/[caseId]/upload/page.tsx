@@ -6,8 +6,8 @@ import { useRouter } from "next/navigation";
 import {
   deleteDocument,
   getDocument,
+  getDocumentExtractionStatus,
   listDocuments,
-  updateDocumentClassification,
   uploadDocuments,
 } from "@/lib/api";
 import type { DocumentRecord } from "@/lib/types";
@@ -96,34 +96,34 @@ function wait(ms: number) {
 }
 
 function getSectionKey(document: DocumentRecord) {
-  const category = document.user_category || document.auto_category;
+  const category = document.user_category || document.auto_category || document.doc_type;
   if (!category) {
     return null;
   }
-
   return CATEGORY_TO_SECTION_KEY[category] || null;
 }
 
 function latestDocumentForSection(sectionKey: SectionKey, documents: DocumentRecord[]) {
-  return documents
-    .filter((document) => getSectionKey(document) === sectionKey)
-    .sort((left, right) => new Date(right.updated_at).getTime() - new Date(left.updated_at).getTime())[0] || null;
+  return (
+    documents
+      .filter((document) => getSectionKey(document) === sectionKey)
+      .sort((left, right) => new Date(right.updated_at).getTime() - new Date(left.updated_at).getTime())[0] || null
+  );
 }
 
-function isClassificationReady(document: DocumentRecord) {
-  if (document.auto_category) {
-    return true;
-  }
+function isClassified(document: DocumentRecord) {
+  return document.status === "classified" || Boolean(document.auto_category || document.doc_type);
+}
 
-  return ["auto_classified", "approved", "user_approved", "rejected"].includes(document.classification_status);
+function isFailed(document: DocumentRecord) {
+  return document.status === "failed" || document.processing_status === "failed";
 }
 
 function buildSectionFromDocument(document: DocumentRecord | null): SectionRecord {
   if (!document) {
     return createEmptySection();
   }
-
-  if (document.processing_status === "failed") {
+  if (isFailed(document)) {
     return {
       state: "error",
       file: null,
@@ -131,8 +131,7 @@ function buildSectionFromDocument(document: DocumentRecord | null): SectionRecor
       error: document.failure_reason || "Upload or classification failed.",
     };
   }
-
-  if (isClassificationReady(document)) {
+  if (isClassified(document)) {
     return {
       state: "complete",
       file: null,
@@ -140,7 +139,6 @@ function buildSectionFromDocument(document: DocumentRecord | null): SectionRecor
       error: null,
     };
   }
-
   return {
     state: "classifying",
     file: null,
@@ -161,7 +159,8 @@ export default function UploadPage({ params }: { params: { caseId: string } }) {
   function updateSection(sectionKey: SectionKey, next: SectionRecord | ((current: SectionRecord) => SectionRecord)) {
     setSections((current) => ({
       ...current,
-      [sectionKey]: typeof next === "function" ? (next as (current: SectionRecord) => SectionRecord)(current[sectionKey]) : next,
+      [sectionKey]:
+        typeof next === "function" ? (next as (current: SectionRecord) => SectionRecord)(current[sectionKey]) : next,
     }));
   }
 
@@ -169,58 +168,54 @@ export default function UploadPage({ params }: { params: { caseId: string } }) {
     pollTokensRef.current[sectionKey] = null;
   }
 
-  async function pollUntilClassified(sectionKey: SectionKey, documentId: string, file: File | null) {
+  async function pollExtractionStatus(sectionKey: SectionKey, documentId: string, file: File | null) {
     const token = Symbol(documentId);
     pollTokensRef.current[sectionKey] = token;
 
     while (mountedRef.current && pollTokensRef.current[sectionKey] === token) {
       try {
-        const nextDocument = await getDocument(documentId);
+        const nextStatus = await getDocumentExtractionStatus(documentId);
         if (!mountedRef.current || pollTokensRef.current[sectionKey] !== token) {
           return;
         }
 
-        if (nextDocument.processing_status === "failed") {
+        updateSection(sectionKey, (current) => ({
+          state: current.doc && isFailed(current.doc) ? "error" : "complete",
+          file: current.file || file,
+          doc: current.doc
+            ? {
+                ...current.doc,
+                extraction_status: nextStatus.extraction_status,
+                extracted: nextStatus.extracted,
+                processing_status:
+                  nextStatus.extraction_status === "processing"
+                    ? "processing"
+                    : nextStatus.extraction_status,
+              }
+            : current.doc,
+          error: null,
+        }));
+
+        if (nextStatus.extraction_status !== "processing") {
+          const refreshed = await getDocument(documentId);
+          if (!mountedRef.current || pollTokensRef.current[sectionKey] !== token) {
+            return;
+          }
           updateSection(sectionKey, {
-            state: "error",
+            state: isFailed(refreshed) ? "error" : "complete",
             file,
-            doc: nextDocument,
-            error: nextDocument.failure_reason || "Upload or classification failed.",
+            doc: refreshed,
+            error: isFailed(refreshed) ? refreshed.failure_reason || "Upload or classification failed." : null,
           });
           return;
         }
-
-        if (isClassificationReady(nextDocument)) {
-          updateSection(sectionKey, (current) => ({
-            state: "complete",
-            file: current.file || file,
-            doc: nextDocument,
-            error: null,
-          }));
-          return;
-        }
-
-        updateSection(sectionKey, (current) => ({
-          state: "classifying",
-          file: current.file || file,
-          doc: nextDocument,
-          error: null,
-        }));
-      } catch (err) {
+      } catch {
         if (!mountedRef.current || pollTokensRef.current[sectionKey] !== token) {
           return;
         }
-
-        updateSection(sectionKey, (current) => ({
-          state: "error",
-          file: current.file || file,
-          doc: current.doc,
-          error: err instanceof Error ? err.message : "Failed to check document classification.",
-        }));
-        return;
       }
 
-      await wait(2000);
+      await wait(3000);
     }
   }
 
@@ -237,7 +232,7 @@ export default function UploadPage({ params }: { params: { caseId: string } }) {
       const matchedDocument = latestDocumentForSection(section.key, documents);
       nextSections[section.key] = buildSectionFromDocument(matchedDocument);
 
-      if (matchedDocument && nextSections[section.key].state === "classifying") {
+      if (matchedDocument?.extraction_status === "processing") {
         pendingPolls.push({ sectionKey: section.key, document: matchedDocument });
       }
     }
@@ -247,22 +242,31 @@ export default function UploadPage({ params }: { params: { caseId: string } }) {
     setLoading(false);
 
     pendingPolls.forEach(({ sectionKey, document }) => {
-      void pollUntilClassified(sectionKey, document.id, null);
+      void pollExtractionStatus(sectionKey, document.id, null);
     });
   }
 
+  async function handleRetry(sectionKey: SectionKey) {
+    const oldDocId = sections[sectionKey].doc?.id;
+    cancelPolling(sectionKey);
+    if (oldDocId) {
+      try {
+        await deleteDocument(oldDocId);
+      } catch {
+        // Ignore delete failures and reset locally.
+      }
+    }
+    updateSection(sectionKey, createEmptySection());
+  }
+
   async function handleFileSelect(sectionKey: SectionKey, file: File) {
-    const sectionConfig = REQUIRED_UPLOADS.find((section) => section.key === sectionKey);
     const currentSection = sections[sectionKey];
-    if (!sectionConfig || ["uploading", "classifying", "complete"].includes(currentSection.state)) {
+    if (currentSection.state === "uploading") {
       return;
     }
 
     setPageError(null);
     cancelPolling(sectionKey);
-
-    let cleanupDocument: DocumentRecord | null = currentSection.doc;
-
     updateSection(sectionKey, {
       state: "uploading",
       file,
@@ -271,9 +275,12 @@ export default function UploadPage({ params }: { params: { caseId: string } }) {
     });
 
     try {
-      if (currentSection.doc) {
-        await deleteDocument(currentSection.doc.id);
-        cleanupDocument = null;
+      if (currentSection.doc?.id) {
+        try {
+          await deleteDocument(currentSection.doc.id);
+        } catch {
+          // Ignore delete failures and continue with the fresh upload.
+        }
       }
 
       const uploaded = await uploadDocuments(params.caseId, [file]);
@@ -282,49 +289,31 @@ export default function UploadPage({ params }: { params: { caseId: string } }) {
         throw new Error("Upload did not return a document.");
       }
 
-      cleanupDocument = uploadedDocument;
-
-      const slottedDocument = await updateDocumentClassification(uploadedDocument.id, {
-        user_category: sectionConfig.category,
-        classification_status: "pending",
-      });
-
-      cleanupDocument = slottedDocument;
-
       updateSection(sectionKey, {
-        state: "classifying",
+        state: "complete",
         file,
-        doc: slottedDocument,
+        doc: uploadedDocument,
         error: null,
       });
 
-      void pollUntilClassified(sectionKey, slottedDocument.id, file);
+      if (uploadedDocument.extraction_status === "processing") {
+        void pollExtractionStatus(sectionKey, uploadedDocument.id, file);
+      }
     } catch (err) {
       updateSection(sectionKey, {
         state: "error",
         file,
-        doc: cleanupDocument,
+        doc: currentSection.doc,
         error: err instanceof Error ? err.message : "Upload failed.",
       });
     }
   }
 
   async function handleReplace(sectionKey: SectionKey) {
-    const currentSection = sections[sectionKey];
-    if (!currentSection.doc) {
-      updateSection(sectionKey, createEmptySection());
-      return;
-    }
-
     setPageError(null);
     setReplacingSection(sectionKey);
-    cancelPolling(sectionKey);
-
     try {
-      await deleteDocument(currentSection.doc.id);
-      updateSection(sectionKey, createEmptySection());
-    } catch (err) {
-      setPageError(err instanceof Error ? err.message : "Failed to remove the existing document.");
+      await handleRetry(sectionKey);
     } finally {
       if (mountedRef.current) {
         setReplacingSection((current) => (current === sectionKey ? null : current));
@@ -336,11 +325,10 @@ export default function UploadPage({ params }: { params: { caseId: string } }) {
     mountedRef.current = true;
     setLoading(true);
 
-    loadSections().catch((err) => {
+    void loadSections().catch((err) => {
       if (!mountedRef.current) {
         return;
       }
-
       setPageError(err instanceof Error ? err.message : "Failed to load documents.");
       setLoading(false);
     });
@@ -362,12 +350,12 @@ export default function UploadPage({ params }: { params: { caseId: string } }) {
               <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-dim">Document intake</p>
               <h1 className="mt-2 font-serif text-3xl text-slate-bright">Upload Required Documents</h1>
               <p className="mt-2 max-w-3xl text-sm text-slate-dim">
-                Each section accepts exactly one file. Uploads run independently, and a section stays locked until you explicitly replace its document.
+                Each section accepts exactly one file. Upload and classification complete fast, and full-document extraction continues in the background.
               </p>
             </div>
 
             <div className="flex items-center gap-2">
-              <Badge tone={readyCount >= 3 ? "success" : "info"}>{readyCount} of 5 ready</Badge>
+              <Badge tone={readyCount >= 3 ? "success" : "info"}>{readyCount} of 5 classified</Badge>
               <Badge tone="neutral">Minimum 3 required</Badge>
             </div>
           </div>
@@ -402,6 +390,9 @@ export default function UploadPage({ params }: { params: { caseId: string } }) {
                   onReplace={() => {
                     void handleReplace(section.key);
                   }}
+                  onRetry={() => {
+                    void handleRetry(section.key);
+                  }}
                 />
               </div>
             ))}
@@ -411,9 +402,9 @@ export default function UploadPage({ params }: { params: { caseId: string } }) {
         <Card className="animate-slide-up stagger-2 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-dim">Ready to review</p>
-            <h2 className="mt-2 text-xl font-semibold text-slate-bright">{readyCount} of 5 documents ready</h2>
+            <h2 className="mt-2 text-xl font-semibold text-slate-bright">{readyCount} of 5 documents classified</h2>
             <p className="mt-1 text-sm text-slate-dim">
-              The classification step unlocks after at least 3 sections reach the complete state.
+              Once at least 3 documents are classified you can continue. Full-text extraction will keep running in the background.
             </p>
           </div>
 

@@ -3,12 +3,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { approveClassification, listDocuments, processCaseDocuments, rejectClassification } from "@/lib/api";
+import { approveClassification, listDocuments, rejectClassification } from "@/lib/api";
 import type { DocumentRecord } from "@/lib/types";
 import { ClassificationCard } from "@/components/classification/classification-card";
 
-const TERMINAL_STATUSES = new Set(["extracted", "completed", "failed"]);
-const ACTIVE_STATUSES = new Set(["queued", "triaging", "parsing", "classifying", "extracting", "processing"]);
+const ACTIVE_EXTRACTION_STATUSES = new Set(["processing"]);
 
 export default function ClassificationPage({ params }: { params: { caseId: string } }) {
   const router = useRouter();
@@ -40,23 +39,7 @@ export default function ClassificationPage({ params }: { params: { caseId: strin
     if (documents.length === 0) {
       return;
     }
-    const hasPending = documents.some((document) => document.processing_status === "pending");
-    const hasActive = documents.some((document) => ACTIVE_STATUSES.has(document.processing_status));
-    if (hasActive) {
-      setProcessing(true);
-      return;
-    }
-    if (hasPending) {
-      setProcessing(true);
-      processCaseDocuments(params.caseId)
-        .then(() => refresh())
-        .catch((err) => setError(err instanceof Error ? err.message : "Processing failed"))
-        .finally(() => setProcessing(false));
-      return;
-    }
-    if (documents.every((document) => TERMINAL_STATUSES.has(document.processing_status))) {
-      setProcessing(false);
-    }
+    setProcessing(documents.some((document) => ACTIVE_EXTRACTION_STATUSES.has(document.extraction_status)));
   }, [documents, params.caseId]);
 
   const reviewedCount = useMemo(
@@ -79,7 +62,7 @@ export default function ClassificationPage({ params }: { params: { caseId: strin
 
       {processing ? (
         <div className="mb-6 rounded-lg border border-[#7a2550] bg-[#3d1a2a] px-4 py-3 text-sm text-[#ff6bb5]">
-          Documents are still processing. Classification cards will update automatically.
+          Full-document extraction is still running in the background. Classification is already available and cards will keep updating automatically.
         </div>
       ) : null}
 

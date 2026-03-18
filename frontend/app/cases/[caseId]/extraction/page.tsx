@@ -36,15 +36,15 @@ export default function ExtractionOverviewPage({ params }: { params: { caseId: s
                 <div className="mt-2 flex items-center gap-2">
                   <Badge
                     tone={
-                      document.processing_status === "completed"
+                      document.extraction_status === "extracted" || document.processing_status === "completed"
                         ? "success"
-                        : document.processing_status === "failed"
-                          ? "danger"
+                        : document.extraction_status === "extraction_failed"
+                          ? "warn"
                           : "warn"
                     }
-                    pulse={document.processing_status === "processing"}
+                    pulse={document.extraction_status === "processing" || document.processing_status === "processing"}
                   >
-                    {document.processing_status}
+                    {document.extraction_status || document.processing_status}
                   </Badge>
                 </div>
               </div>

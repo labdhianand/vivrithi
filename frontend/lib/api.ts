@@ -15,6 +15,7 @@ import type {
   SchemaField,
   SchemaRecord,
   SWOT,
+  DocumentExtractionStatusRecord,
 } from "@/lib/types";
 
 const API_BASE = (
@@ -80,6 +81,10 @@ export async function listDocuments(caseId: string) {
 
 export async function getDocument(documentId: string) {
   return request<DocumentRecord>(`/api/documents/${documentId}`);
+}
+
+export async function getDocumentExtractionStatus(documentId: string) {
+  return request<DocumentExtractionStatusRecord>(`/api/documents/${documentId}/extraction-status`);
 }
 
 export async function deleteDocument(documentId: string) {

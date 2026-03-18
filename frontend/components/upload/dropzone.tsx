@@ -65,6 +65,7 @@ export function Dropzone({
   replacing,
   onFileSelect,
   onReplace,
+  onRetry,
 }: {
   title: string;
   description: string;
@@ -75,6 +76,7 @@ export function Dropzone({
   replacing?: boolean;
   onFileSelect: (file: File) => void;
   onReplace?: () => void;
+  onRetry?: () => void;
 }) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [dragActive, setDragActive] = useState(false);
@@ -150,7 +152,7 @@ export function Dropzone({
 
           {state === "error" ? (
             <div className="mt-3">
-              <Button type="button" variant="secondary" size="sm" onClick={openPicker}>
+              <Button type="button" variant="secondary" size="sm" onClick={onRetry}>
                 Try again
               </Button>
             </div>
@@ -208,7 +210,7 @@ export function Dropzone({
 
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <span className="inline-flex items-center rounded-full bg-[#3d1a2a] px-3 py-1 text-xs font-semibold text-[#ff6bb5]">
-              {formatCategory(document?.auto_category || document?.user_category)}
+              {formatCategory(document?.doc_type || document?.auto_category || document?.user_category)}
               {confidenceLabel ? ` - ${confidenceLabel}` : ""}
             </span>
 
@@ -224,6 +226,33 @@ export function Dropzone({
               </Button>
             ) : null}
           </div>
+
+          {document?.extraction_status === "processing" ? (
+            <div className="mt-3 space-y-2">
+              <div className="flex items-center gap-2 text-xs text-[#ad6883]">
+                <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-[#ad6883]/30 border-t-[#ad6883]" />
+                <span>Extracting full document...</span>
+              </div>
+              {(activeFileSize || 0) > 5_000_000 ? (
+                <div className="rounded-lg border border-amber-800 bg-amber-950 px-3 py-2 text-xs text-amber-300">
+                  Large document detected - extracting in background. You can continue uploading other documents.
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
+          {document?.extraction_status === "extracted" ? (
+            <div className="mt-3 flex items-center gap-2 text-xs text-green-300">
+              <span className="h-2 w-2 rounded-full bg-green-400" />
+              <span>Ready for schema</span>
+            </div>
+          ) : null}
+
+          {document?.extraction_status === "extraction_failed" ? (
+            <div className="mt-3 rounded-lg border border-amber-800 bg-amber-950 px-3 py-2 text-xs text-amber-300">
+              Extraction incomplete - some fields may need manual entry
+            </div>
+          ) : null}
         </div>
       ) : null}
 

@@ -60,6 +60,11 @@ async def _apply_runtime_migrations(conn) -> None:
         conn,
         "documents",
         {
+            "status": "VARCHAR DEFAULT 'uploaded'",
+            "classification_reason": "TEXT",
+            "classification_text": "TEXT",
+            "extraction_status": "VARCHAR DEFAULT 'pending'",
+            "extracted_text": "TEXT",
             "failure_reason": "TEXT",
         },
     )

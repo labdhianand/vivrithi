@@ -28,24 +28,38 @@ export interface CaseRecord {
 
 export interface DocumentRecord {
   id: string;
+  doc_id?: string;
   case_id: string;
+  filename?: string;
   original_filename: string;
   stored_path: string;
   file_size_bytes?: number | null;
   mime_type?: string | null;
   sha256_hash?: string | null;
+  status: string;
   auto_category?: string | null;
   auto_category_confidence?: string | null;
   user_category?: string | null;
+  doc_type?: string | null;
+  confidence?: string | null;
+  reason?: string | null;
   classification_status: string;
+  extraction_status: string;
   processing_status: string;
   failure_reason?: string | null;
+  extracted: boolean;
   current_stage: string;
   progress_percent: number;
   total_pages?: number | null;
   raw_markdown?: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface DocumentExtractionStatusRecord {
+  doc_id: string;
+  extraction_status: string;
+  extracted: boolean;
 }
 
 export interface PageRecord {

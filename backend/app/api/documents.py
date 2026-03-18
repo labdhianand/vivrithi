@@ -2,13 +2,16 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
+import shutil
 import uuid
+from decimal import Decimal
 from pathlib import Path
 
 import fitz
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, Response, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import get_settings
@@ -16,8 +19,19 @@ from ..database import SessionLocal, get_session
 from ..models.case import Case
 from ..models.document import Document
 from ..models.page import Page
-from ..schemas.document import DocumentClassificationUpdate, DocumentPageRead, DocumentProcessRead, DocumentRead
-from ..services.document_pipeline import process_document
+from ..schemas.document import (
+    DocumentClassificationUpdate,
+    DocumentExtractionStatusRead,
+    DocumentPageRead,
+    DocumentProcessRead,
+    DocumentRead,
+)
+from ..services.document_pipeline import (
+    classify_uploaded_document,
+    extract_document_payload,
+    process_document,
+)
+from ..services.pdf_triage import classify_page_content
 from ..services.runtime import (
     DocumentArtifact,
     build_docling_artifact,
@@ -77,6 +91,107 @@ class DocumentProcessingError(RuntimeError):
         self.status_code = status_code
 
 
+def _background_extraction_timeout_seconds(file_path: str) -> int:
+    file_size = os.path.getsize(file_path)
+    if file_size > 5_000_000:
+        return 300
+    if file_size > 2_000_000:
+        return 180
+    return 120
+
+
+async def _refresh_case_status(session: AsyncSession, case_id: str) -> None:
+    case = await session.get(Case, case_id)
+    if case is None:
+        return
+    result = await session.execute(
+        select(Document).where(Document.case_id == case_id).order_by(Document.created_at)
+    )
+    documents = list(result.scalars().all())
+    if not documents:
+        case.status = "onboarding"
+        return
+    if any(document.extraction_status == "processing" for document in documents):
+        case.status = "extracting"
+        return
+    if any(document.extraction_status == "extracted" for document in documents):
+        case.status = "extracted"
+        return
+    case.status = "documents_uploaded"
+
+
+async def _replace_document_pages(
+    session: AsyncSession,
+    document: Document,
+    parsed_pages,
+) -> None:
+    await session.execute(delete(Page).where(Page.document_id == document.id))
+    for parsed_page in parsed_pages:
+        has_tables = bool(parsed_page.tables)
+        session.add(
+            Page(
+                document_id=document.id,
+                page_number=parsed_page.page_number,
+                is_scanned=False,
+                has_tables=has_tables,
+                content_type=classify_page_content(parsed_page.text, False, has_tables),
+                parser_used=parsed_page.parser_used or "marker_api",
+                raw_text=parsed_page.text,
+                raw_markdown=parsed_page.markdown,
+                page_image_path=None,
+                parsing_confidence=Decimal(str(round(parsed_page.confidence, 4))),
+                parsing_duration_ms=0,
+            )
+        )
+
+
+async def run_full_extraction_background(
+    doc_id: str,
+    file_path: str,
+    case_id: str,
+) -> None:
+    timeout_seconds = _background_extraction_timeout_seconds(file_path)
+    try:
+        async with SessionLocal() as session:
+            document = await session.get(Document, doc_id)
+            if document is None:
+                return
+            document.extraction_status = "processing"
+            document.processing_status = "processing"
+            document.failure_reason = None
+            await _refresh_case_status(session, case_id)
+            await session.commit()
+
+        _, payload, parsed_pages = await asyncio.wait_for(
+            extract_document_payload(Path(file_path)),
+            timeout=timeout_seconds,
+        )
+
+        async with SessionLocal() as session:
+            document = await session.get(Document, doc_id)
+            if document is None:
+                return
+            document.extracted_text = payload.get("markdown") or payload.get("text") or ""
+            document.total_pages = int(payload.get("page_count") or len(parsed_pages))
+            document.extraction_status = "extracted"
+            document.processing_status = "extracted"
+            document.failure_reason = None
+            await _replace_document_pages(session, document, parsed_pages)
+            await _refresh_case_status(session, case_id)
+            await session.commit()
+    except Exception as exc:
+        logger.exception("Background extraction failed for %s", doc_id)
+        async with SessionLocal() as session:
+            document = await session.get(Document, doc_id)
+            if document is None:
+                return
+            document.extraction_status = "extraction_failed"
+            document.processing_status = "extraction_failed"
+            document.failure_reason = str(exc)[:1000] or "Background extraction failed"
+            await _refresh_case_status(session, case_id)
+            await session.commit()
+
+
 def _normalize_process_backend(backend: str | None) -> str:
     selected = (backend or get_settings().document_processing_backend or "docling_remote").strip().lower()
     if selected not in PROCESS_BACKENDS:
@@ -103,7 +218,12 @@ async def _mark_document_failed(
     document: Document,
     message: str,
 ) -> None:
-    document.processing_status = "failed"
+    if document.status == "classified":
+        document.extraction_status = "extraction_failed"
+        document.processing_status = "extraction_failed"
+    else:
+        document.status = "failed"
+        document.processing_status = "failed"
     document.failure_reason = (message or "Processing failed")[:1000]
     await session.commit()
 
@@ -171,6 +291,7 @@ async def _ensure_page_image(
 @router.post("/cases/{case_id}/documents/upload", response_model=list[DocumentRead])
 async def upload_documents(
     case_id: str,
+    background_tasks: BackgroundTasks,
     files: list[UploadFile] = File(...),
     session: AsyncSession = Depends(get_session),
 ) -> list[Document]:
@@ -178,7 +299,6 @@ async def upload_documents(
     if not case:
         raise HTTPException(status_code=404, detail="Case not found")
 
-    selected_backend = _normalize_process_backend(get_settings().document_processing_backend)
     documents: list[Document] = []
     for upload in files:
         filename = upload.filename or "document"
@@ -198,16 +318,48 @@ async def upload_documents(
             file_size_bytes=stored["file_size_bytes"],
             mime_type=stored["mime_type"],
             sha256_hash=stored["sha256"],
-            processing_status="queued",
+            status="uploaded",
+            processing_status="pending",
+            extraction_status="pending",
         )
         session.add(document)
-        documents.append(document)
+        await session.flush()
 
-    case.status = "documents_uploaded"
+        source_path = storage.absolute_path(document.stored_path)
+        try:
+            classification, first_page_text = await classify_uploaded_document(
+                source_path,
+                filename=document.original_filename,
+            )
+        except Exception as exc:
+            logger.exception("Upload classification failed for %s", filename)
+            document.status = "failed"
+            document.processing_status = "failed"
+            document.failure_reason = str(exc)[:1000] or "Classification failed"
+            await session.commit()
+            raise HTTPException(status_code=500, detail=document.failure_reason) from exc
+
+        document.status = "classified"
+        document.auto_category = classification.category
+        document.auto_category_confidence = Decimal(str(round(classification.confidence, 4)))
+        document.classification_reason = classification.reasoning
+        document.classification_text = first_page_text
+        document.classification_status = "auto_classified"
+        document.extraction_status = "processing"
+        document.processing_status = "processing"
+        document.failure_reason = None
+        documents.append(document)
+        background_tasks.add_task(
+            run_full_extraction_background,
+            doc_id=document.id,
+            file_path=str(source_path),
+            case_id=case_id,
+        )
+
+    case.status = "extracting"
     await session.commit()
     for document in documents:
         await session.refresh(document)
-    _enqueue_case_processing(case_id, [document.id for document in documents], selected_backend)
     return documents
 
 
@@ -298,6 +450,41 @@ async def get_document(doc_id: str, session: AsyncSession = Depends(get_session)
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")
     return document
+
+
+@router.get("/documents/{doc_id}/extraction-status", response_model=DocumentExtractionStatusRead)
+async def get_document_extraction_status(
+    doc_id: str,
+    session: AsyncSession = Depends(get_session),
+) -> DocumentExtractionStatusRead:
+    document = await session.get(Document, doc_id)
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+    return DocumentExtractionStatusRead(
+        doc_id=document.id,
+        extraction_status=document.extraction_status,
+        extracted=document.extraction_status == "extracted",
+    )
+
+
+@router.delete("/documents/{doc_id}", status_code=204)
+async def delete_document(
+    doc_id: str,
+    session: AsyncSession = Depends(get_session),
+) -> Response:
+    document = await session.get(Document, doc_id)
+    if not document:
+        return Response(status_code=204)
+    case_id = document.case_id
+    absolute_path = storage.absolute_path(document.stored_path)
+    document_dir = absolute_path.parent
+    await session.delete(document)
+    await session.commit()
+    if document_dir.exists():
+        shutil.rmtree(document_dir, ignore_errors=True)
+    await _refresh_case_status(session, case_id)
+    await session.commit()
+    return Response(status_code=204)
 
 
 @router.patch("/documents/{doc_id}/classify", response_model=DocumentRead)
@@ -495,4 +682,4 @@ async def get_document_markdown(doc_id: str, session: AsyncSession = Depends(get
     document = await session.get(Document, doc_id)
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")
-    return PlainTextResponse(document.raw_markdown or "")
+    return PlainTextResponse(document.extracted_text or document.raw_markdown or "")

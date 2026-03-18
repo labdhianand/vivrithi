@@ -21,7 +21,10 @@ const statusTone: Record<string, "default" | "success" | "warn" | "danger" | "in
 const processingTone: Record<string, "default" | "success" | "warn" | "danger" | "info" | "neutral"> = {
   pending: "neutral",
   processing: "warn",
+  classified: "info",
   completed: "success",
+  extracted: "success",
+  extraction_failed: "warn",
   failed: "danger",
 };
 
@@ -140,8 +143,8 @@ export default function CaseOverviewPage({ params }: { params: { caseId: string 
                   </span>
                 </div>
               </div>
-              <Badge tone={processingTone[item.processing_status] ?? "neutral"} className="ml-3 shrink-0">
-                {item.processing_status}
+              <Badge tone={processingTone[item.extraction_status || item.processing_status] ?? "neutral"} className="ml-3 shrink-0">
+                {item.extraction_status || item.processing_status}
               </Badge>
             </div>
           ))}
