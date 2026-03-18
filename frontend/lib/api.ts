@@ -18,16 +18,22 @@ import type {
   DocumentExtractionStatusRecord,
 } from "@/lib/types";
 
-const API_BASE = (
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+const SERVER_API_BASE = (
+  process.env.INTERNAL_API_URL ||
+  process.env.NEXT_PUBLIC_API_URL ||
+  "http://127.0.0.1:8100"
 ).replace(/\/$/, "");
+
+function buildApiUrl(path: string): string {
+  return typeof window === "undefined" ? `${SERVER_API_BASE}${path}` : path;
+}
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers);
   if (!(init?.body instanceof FormData) && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
-  const response = await fetch(`${API_BASE}${path}`, {
+  const response = await fetch(buildApiUrl(path), {
     ...init,
     headers,
     cache: "no-store",
@@ -247,9 +253,9 @@ export async function getReportPreview(reportId: string) {
 }
 
 export function getPageImageUrl(documentId: string, pageNumber: number) {
-  return `${API_BASE}/api/documents/${documentId}/pages/${pageNumber}/image`;
+  return `/api/documents/${documentId}/pages/${pageNumber}/image`;
 }
 
 export function getReportDownloadUrl(reportId: string, format: "docx" | "pdf") {
-  return `${API_BASE}/api/reports/${reportId}/download/${format}`;
+  return `/api/reports/${reportId}/download/${format}`;
 }
