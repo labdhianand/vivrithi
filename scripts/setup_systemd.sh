@@ -97,7 +97,7 @@ Wants=network.target
 [Service]
 Type=simple
 User=moslab
-WorkingDirectory=/home/moslab/vivriti/backend
+WorkingDirectory=/home/moslab/vivriti
 Environment="PATH=${BACKEND_BIN_DIR}:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin"
 Environment="PYTHONPATH=/home/moslab/vivriti/backend"
 EnvironmentFile=${BACKEND_ENV_FILE}
