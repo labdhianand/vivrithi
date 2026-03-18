@@ -21,6 +21,16 @@ if [[ ! -x "${BACKEND_UVICORN}" ]]; then
 fi
 echo "Using backend runtime: ${BACKEND_UVICORN}"
 
+BACKEND_ENV_FILE="/home/moslab/vivriti/backend/.env"
+if [[ ! -f "${BACKEND_ENV_FILE}" && -f /home/moslab/vivriti/.env ]]; then
+  BACKEND_ENV_FILE="/home/moslab/vivriti/.env"
+fi
+if [[ ! -f "${BACKEND_ENV_FILE}" ]]; then
+  echo "Unable to find a backend environment file."
+  exit 1
+fi
+echo "Using backend env file: ${BACKEND_ENV_FILE}"
+
 MARKER_PYTHON="/home/moslab/miniconda3/envs/vivriti/bin/python"
 if ! /home/moslab/miniconda3/envs/vivriti/bin/python -c "import marker" >/dev/null 2>&1; then
   if [[ -x /home/moslab/marker-service/.venv/bin/python ]] && /home/moslab/marker-service/.venv/bin/python -c "import marker" >/dev/null 2>&1; then
@@ -90,7 +100,7 @@ User=moslab
 WorkingDirectory=/home/moslab/vivriti/backend
 Environment="PATH=${BACKEND_BIN_DIR}:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin"
 Environment="PYTHONPATH=/home/moslab/vivriti/backend"
-EnvironmentFile=/home/moslab/vivriti/backend/.env
+EnvironmentFile=${BACKEND_ENV_FILE}
 ExecStart=${BACKEND_UVICORN} app.main:app --host 127.0.0.1 --port 8100
 Restart=always
 RestartSec=5
