@@ -18,6 +18,16 @@ import type {
   DocumentExtractionStatusRecord,
 } from "@/lib/types";
 
+type LegacyExtractionCandidate = {
+  id: string;
+  extraction_id: string;
+  field_key: string;
+  was_selected: boolean;
+  value?: string | null;
+  confidence?: string | null;
+  [key: string]: unknown;
+};
+
 const SERVER_API_BASE = (
   process.env.INTERNAL_API_URL ||
   process.env.NEXT_PUBLIC_API_URL ||
@@ -163,13 +173,13 @@ export async function listExtractions(documentId: string) {
   return request<ExtractionRecord[]>(`/api/documents/${documentId}/extractions`);
 }
 
-export async function listCandidates(..._args: unknown[]) {
+export async function listCandidates(..._args: unknown[]): Promise<LegacyExtractionCandidate[]> {
   // Compatibility shim for stale client code paths that still import candidate APIs.
-  return [] as Array<Record<string, unknown>>;
+  return [];
 }
 
-export async function selectCandidate(..._args: unknown[]) {
-  return null as Record<string, unknown> | null;
+export async function selectCandidate(..._args: unknown[]): Promise<LegacyExtractionCandidate | null> {
+  return null;
 }
 
 export async function updateExtraction(extractionId: string, payload: Partial<ExtractionRecord>) {
