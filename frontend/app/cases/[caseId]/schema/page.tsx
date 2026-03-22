@@ -12,6 +12,7 @@ import {
   updateExtraction,
   updateSchema,
 } from "@/lib/api";
+import { getDocumentCategory } from "@/lib/document-category";
 import type { DocumentRecord, ExtractionRecord, SchemaField, SchemaRecord } from "@/lib/types";
 import { SchemaEditor } from "@/components/schema/schema-editor";
 import { Badge } from "@/components/ui/badge";
@@ -58,7 +59,7 @@ export default function SchemaPage({ params }: { params: { caseId: string } }) {
     const categories = Array.from(
       new Set(
         documents
-          .map((item) => item.user_category || item.auto_category || item.doc_type)
+          .map((item) => getDocumentCategory(item))
           .filter((value): value is string => Boolean(value)),
       ),
     );
@@ -84,7 +85,7 @@ export default function SchemaPage({ params }: { params: { caseId: string } }) {
 
     const latestDocsByCategory = new Map<string, DocumentRecord>();
     for (const document of documents) {
-      const category = document.user_category || document.auto_category || document.doc_type;
+      const category = getDocumentCategory(document);
       if (!category) {
         continue;
       }

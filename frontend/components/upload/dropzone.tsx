@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 
+import { getDocumentCategory } from "@/lib/document-category";
 import type { DocumentRecord } from "@/lib/types";
 
 type DropzoneState = "empty" | "uploading" | "classifying" | "complete" | "error";
@@ -81,7 +82,7 @@ export function Dropzone({
 
   const activeFileName = file?.name || document?.original_filename || label;
   const activeFileSize = file?.size ?? document?.file_size_bytes;
-  const activeCategory = document?.doc_type || document?.auto_category || document?.user_category;
+  const activeCategory = getDocumentCategory(document);
   const confidenceLabel = formatConfidence(document?.auto_category_confidence || document?.confidence);
   const showPicker = state === "empty" || state === "error";
 

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { deleteDocument, getDocument, listDocuments, uploadDocuments } from "@/lib/api";
+import { getDocumentCategory } from "@/lib/document-category";
 import type { DocumentRecord } from "@/lib/types";
 import { Dropzone } from "@/components/upload/dropzone";
 
@@ -35,7 +36,7 @@ function wait(ms: number) {
 }
 
 function isClassified(document: DocumentRecord) {
-  return Boolean(document.user_category || document.auto_category || document.doc_type);
+  return Boolean(getDocumentCategory(document));
 }
 
 function isFailed(document: DocumentRecord) {

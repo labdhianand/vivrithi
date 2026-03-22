@@ -163,6 +163,15 @@ export async function listExtractions(documentId: string) {
   return request<ExtractionRecord[]>(`/api/documents/${documentId}/extractions`);
 }
 
+export async function listCandidates(..._args: unknown[]) {
+  // Compatibility shim for stale client code paths that still import candidate APIs.
+  return [] as Array<Record<string, unknown>>;
+}
+
+export async function selectCandidate(..._args: unknown[]) {
+  return null as Record<string, unknown> | null;
+}
+
 export async function updateExtraction(extractionId: string, payload: Partial<ExtractionRecord>) {
   return request<ExtractionRecord>(`/api/extractions/${extractionId}`, {
     method: "PATCH",
@@ -223,6 +232,17 @@ export async function interpretNote(caseId: string, payload: { note_type?: strin
   return request<AnalystNoteInterpretation>(`/api/cases/${caseId}/notes/interpret`, {
     method: "POST",
     body: JSON.stringify(payload),
+  });
+}
+
+export async function previewNoteImpact(...args: unknown[]) {
+  const [caseId, payload] = args as [string | undefined, { note_type?: string | null; content?: string } | undefined];
+  if (typeof caseId !== "string" || !payload || typeof payload.content !== "string") {
+    throw new Error("previewNoteImpact requires a caseId and note content");
+  }
+  return interpretNote(caseId, {
+    note_type: payload.note_type ?? null,
+    content: payload.content,
   });
 }
 
