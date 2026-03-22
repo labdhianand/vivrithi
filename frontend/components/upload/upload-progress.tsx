@@ -1,4 +1,10 @@
 import type { DocumentRecord } from "@/lib/types";
+import {
+  getDocumentCategory,
+  getDocumentExtractionStatus,
+  getDocumentFileSize,
+  getDocumentProcessingStatus,
+} from "@/lib/document-category";
 
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -31,7 +37,7 @@ function formatBytes(bytes: number | null | undefined): string {
 
 export function UploadProgress({ documents }: { documents: DocumentRecord[] }) {
   const completedCount = documents.filter(
-    (d) => d.extraction_status === "extracted" || d.processing_status === "completed",
+    (d) => getDocumentExtractionStatus(d) === "extracted" || getDocumentProcessingStatus(d) === "completed",
   ).length;
 
   return (
@@ -84,21 +90,21 @@ export function UploadProgress({ documents }: { documents: DocumentRecord[] }) {
                   {document.original_filename}
                 </div>
                 <div className="mt-0.5 flex items-center gap-2 text-xs text-slate-dim">
-                  <span>{document.auto_category || document.user_category || "Pending classification"}</span>
-                  {document.file_size_bytes && (
+                  <span>{getDocumentCategory(document) || "Pending classification"}</span>
+                  {getDocumentFileSize(document) && (
                     <>
                       <span className="text-white/10">|</span>
-                      <span>{formatBytes(document.file_size_bytes)}</span>
+                      <span>{formatBytes(getDocumentFileSize(document))}</span>
                     </>
                   )}
                 </div>
               </div>
             </div>
             <Badge
-              tone={statusTone(document.extraction_status || document.processing_status)}
-              pulse={document.extraction_status === "processing" || document.processing_status === "processing"}
+              tone={statusTone(getDocumentExtractionStatus(document) || getDocumentProcessingStatus(document) || "pending")}
+              pulse={getDocumentExtractionStatus(document) === "processing" || getDocumentProcessingStatus(document) === "processing"}
             >
-              {document.extraction_status || document.processing_status}
+              {getDocumentExtractionStatus(document) || getDocumentProcessingStatus(document)}
             </Badge>
           </div>
         ))}

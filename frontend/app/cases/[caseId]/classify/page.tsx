@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { approveClassification, listDocuments, rejectClassification } from "@/lib/api";
+import { getDocumentExtractionStatus } from "@/lib/document-category";
 import type { DocumentRecord } from "@/lib/types";
 import { ClassificationCard } from "@/components/classification/classification-card";
 
@@ -39,7 +40,7 @@ export default function ClassificationPage({ params }: { params: { caseId: strin
     if (documents.length === 0) {
       return;
     }
-    setProcessing(documents.some((document) => ACTIVE_EXTRACTION_STATUSES.has(document.extraction_status)));
+    setProcessing(documents.some((document) => ACTIVE_EXTRACTION_STATUSES.has(getDocumentExtractionStatus(document) || "")));
   }, [documents, params.caseId]);
 
   const reviewedCount = useMemo(

@@ -4,7 +4,13 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { deleteDocument, getDocument, listDocuments, uploadDocuments } from "@/lib/api";
-import { getDocumentCategory } from "@/lib/document-category";
+import {
+  getDocumentCategory,
+  getDocumentExtractionStatus,
+  getDocumentFailureReason,
+  getDocumentLifecycleStatus,
+  getDocumentProcessingStatus,
+} from "@/lib/document-category";
 import type { DocumentRecord } from "@/lib/types";
 import { Dropzone } from "@/components/upload/dropzone";
 
@@ -40,7 +46,7 @@ function isClassified(document: DocumentRecord) {
 }
 
 function isFailed(document: DocumentRecord) {
-  return document.status === "failed" || document.processing_status === "failed";
+  return getDocumentLifecycleStatus(document) === "failed" || getDocumentProcessingStatus(document) === "failed";
 }
 
 function resolveSlotState(document: DocumentRecord): SlotState {
@@ -54,7 +60,7 @@ function resolveSlotState(document: DocumentRecord): SlotState {
 }
 
 function shouldPollDocument(document: DocumentRecord) {
-  return !isFailed(document) && (!isClassified(document) || document.extraction_status === "processing");
+  return !isFailed(document) && (!isClassified(document) || getDocumentExtractionStatus(document) === "processing");
 }
 
 function buildSlotFromDocument(document: DocumentRecord | null): UploadSlot {
@@ -66,7 +72,7 @@ function buildSlotFromDocument(document: DocumentRecord | null): UploadSlot {
     state: resolveSlotState(document),
     file: null,
     doc: document,
-    error: isFailed(document) ? document.failure_reason || "Upload or classification failed." : null,
+    error: isFailed(document) ? getDocumentFailureReason(document) || "Upload or classification failed." : null,
   };
 }
 
@@ -106,7 +112,7 @@ export default function UploadPage({ params }: { params: { caseId: string } }) {
           state: resolveSlotState(refreshed),
           file,
           doc: refreshed,
-          error: isFailed(refreshed) ? refreshed.failure_reason || "Upload or classification failed." : null,
+          error: isFailed(refreshed) ? getDocumentFailureReason(refreshed) || "Upload or classification failed." : null,
         });
 
         if (!shouldPollDocument(refreshed)) {
@@ -196,7 +202,7 @@ export default function UploadPage({ params }: { params: { caseId: string } }) {
         state: resolveSlotState(uploadedDocument),
         file,
         doc: uploadedDocument,
-        error: isFailed(uploadedDocument) ? uploadedDocument.failure_reason || "Upload failed." : null,
+        error: isFailed(uploadedDocument) ? getDocumentFailureReason(uploadedDocument) || "Upload failed." : null,
       });
 
       if (shouldPollDocument(uploadedDocument)) {

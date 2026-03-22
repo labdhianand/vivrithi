@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import { getDocumentCategory, getDocumentConfidence } from "@/lib/document-category";
 import type { DocumentRecord } from "@/lib/types";
 import { DOCUMENT_CATEGORIES } from "@/lib/utils";
 
@@ -18,9 +19,9 @@ export function ClassificationCard({
   onApprove: (category: string) => Promise<void>;
   onReject: () => Promise<void>;
 }) {
-  const [category, setCategory] = useState(document.user_category || document.auto_category || DOCUMENT_CATEGORIES[0]);
+  const [category, setCategory] = useState(getDocumentCategory(document) || DOCUMENT_CATEGORIES[0]);
   const [busy, setBusy] = useState<"approve" | "reject" | null>(null);
-  const confidence = Math.round(Number(document.auto_category_confidence || 0) * 100);
+  const confidence = Math.round(Number(getDocumentConfidence(document) || 0) * 100);
   const approved = ["approved", "user_approved"].includes(document.classification_status);
   const rejected = document.classification_status === "rejected";
   const reviewed = approved || rejected;
@@ -49,7 +50,7 @@ export function ClassificationCard({
 
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <span className={`rounded-full px-3 py-1 text-sm font-medium ${badgeClass()}`}>
-              {(document.auto_category || category).replace(/_/g, " ")}
+              {(getDocumentCategory(document) || category).replace(/_/g, " ")}
             </span>
             <span className="text-sm text-[#ad6883]">Confidence {confidence}%</span>
           </div>
@@ -59,8 +60,8 @@ export function ClassificationCard({
           </div>
 
           <p className="mt-3 text-sm text-[#ad6883]">
-            {document.auto_category
-              ? `Predicted from layout signals and first-page content for ${(document.auto_category || "").replace(/_/g, " ")}.`
+            {getDocumentCategory(document)
+              ? `Predicted from layout signals and first-page content for ${(getDocumentCategory(document) || "").replace(/_/g, " ")}.`
               : "Awaiting AI classification output."}
           </p>
         </div>

@@ -2,7 +2,14 @@
 
 import { useRef, useState } from "react";
 
-import { getDocumentCategory } from "@/lib/document-category";
+import {
+  getDocumentCategory,
+  getDocumentConfidence,
+  getDocumentCurrentStage,
+  getDocumentExtractionStatus,
+  getDocumentFileSize,
+  getDocumentProcessingStatus,
+} from "@/lib/document-category";
 import type { DocumentRecord } from "@/lib/types";
 
 type DropzoneState = "empty" | "uploading" | "classifying" | "complete" | "error";
@@ -40,7 +47,7 @@ function formatConfidence(confidence: string | null | undefined) {
 }
 
 function stageLabel(document?: DocumentRecord | null) {
-  switch (document?.current_stage || document?.processing_status) {
+  switch (getDocumentCurrentStage(document) || getDocumentProcessingStatus(document)) {
     case "queued":
       return "Queued for processing";
     case "triaging":
@@ -81,10 +88,11 @@ export function Dropzone({
   const [dragActive, setDragActive] = useState(false);
 
   const activeFileName = file?.name || document?.original_filename || label;
-  const activeFileSize = file?.size ?? document?.file_size_bytes;
+  const activeFileSize = file?.size ?? getDocumentFileSize(document);
   const activeCategory = getDocumentCategory(document);
-  const confidenceLabel = formatConfidence(document?.auto_category_confidence || document?.confidence);
+  const confidenceLabel = formatConfidence(getDocumentConfidence(document));
   const showPicker = state === "empty" || state === "error";
+  const extractionStatus = getDocumentExtractionStatus(document);
 
   function openPicker() {
     inputRef.current?.click();
@@ -197,7 +205,7 @@ export function Dropzone({
             {confidenceLabel ? <span className="text-xs text-[#ad6883]">{confidenceLabel}</span> : null}
           </div>
 
-          {document?.extraction_status === "processing" ? (
+          {extractionStatus === "processing" ? (
             <div className="mt-4 space-y-2">
               <div className="flex items-center gap-2 text-xs text-[#ad6883]">
                 <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-[#ad6883]/30 border-t-[#ad6883]" />
@@ -211,14 +219,14 @@ export function Dropzone({
             </div>
           ) : null}
 
-          {document?.extraction_status === "extracted" ? (
+          {extractionStatus === "extracted" ? (
             <div className="mt-4 flex items-center gap-2 text-xs text-emerald-300">
               <span className="h-2 w-2 rounded-full bg-emerald-400" />
               <span>Ready for schema</span>
             </div>
           ) : null}
 
-          {document?.extraction_status === "extraction_failed" ? (
+          {extractionStatus === "extraction_failed" ? (
             <div className="mt-4 rounded-lg border border-amber-900/70 bg-amber-950/40 px-3 py-2 text-xs text-amber-300">
               Extraction completed partially. Some fields may need manual entry later.
             </div>

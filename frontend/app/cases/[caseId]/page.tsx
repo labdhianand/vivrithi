@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { getCase, listDocuments } from "@/lib/api";
+import { getDocumentCategory, getDocumentExtractionStatus, getDocumentProcessingStatus } from "@/lib/document-category";
 import type { CaseRecord, DocumentRecord } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -223,12 +224,12 @@ export default function CaseOverviewPage({ params }: { params: { caseId: string 
                 </div>
                 <div className="mt-1.5 flex flex-wrap items-center gap-2">
                   <span className="text-xs text-slate-dim">
-                    {item.user_category || item.auto_category || "Uncategorized"}
+                    {getDocumentCategory(item) || "Uncategorized"}
                   </span>
                 </div>
               </div>
-              <Badge tone={processingTone[item.extraction_status || item.processing_status] ?? "neutral"} className="ml-3 shrink-0">
-                {item.extraction_status || item.processing_status}
+              <Badge tone={processingTone[getDocumentExtractionStatus(item) || getDocumentProcessingStatus(item) || "pending"] ?? "neutral"} className="ml-3 shrink-0">
+                {getDocumentExtractionStatus(item) || getDocumentProcessingStatus(item)}
               </Badge>
             </div>
           ))}

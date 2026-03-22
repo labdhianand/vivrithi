@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { listDocuments } from "@/lib/api";
+import { getDocumentCategory, getDocumentExtractionStatus, getDocumentProcessingStatus } from "@/lib/document-category";
 import type { DocumentRecord } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -31,20 +32,20 @@ export default function ExtractionOverviewPage({ params }: { params: { caseId: s
           <Card key={document.id} className="border-[#4a1530] bg-[#1f0d16]">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="min-w-0 flex-1">
-                <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-dim">{document.user_category || document.auto_category || "Pending"}</p>
+                <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-dim">{getDocumentCategory(document) || "Pending"}</p>
                 <h3 className="mt-1.5 truncate text-base font-semibold text-slate-bright">{document.original_filename}</h3>
                 <div className="mt-2 flex items-center gap-2">
                   <Badge
                     tone={
-                      document.extraction_status === "extracted" || document.processing_status === "completed"
+                      getDocumentExtractionStatus(document) === "extracted" || getDocumentProcessingStatus(document) === "completed"
                         ? "success"
-                        : document.extraction_status === "extraction_failed"
+                        : getDocumentExtractionStatus(document) === "extraction_failed"
                           ? "warn"
                           : "warn"
                     }
-                    pulse={document.extraction_status === "processing" || document.processing_status === "processing"}
+                    pulse={getDocumentExtractionStatus(document) === "processing" || getDocumentProcessingStatus(document) === "processing"}
                   >
-                    {document.extraction_status || document.processing_status}
+                    {getDocumentExtractionStatus(document) || getDocumentProcessingStatus(document)}
                   </Badge>
                 </div>
               </div>

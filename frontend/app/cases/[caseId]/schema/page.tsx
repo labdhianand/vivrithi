@@ -12,7 +12,7 @@ import {
   updateExtraction,
   updateSchema,
 } from "@/lib/api";
-import { getDocumentCategory } from "@/lib/document-category";
+import { getDocumentCategory, getDocumentExtractionStatus } from "@/lib/document-category";
 import type { DocumentRecord, ExtractionRecord, SchemaField, SchemaRecord } from "@/lib/types";
 import { SchemaEditor } from "@/components/schema/schema-editor";
 import { Badge } from "@/components/ui/badge";
@@ -110,7 +110,7 @@ export default function SchemaPage({ params }: { params: { caseId: string } }) {
 
     setSchemaPreviews(Object.fromEntries(previewEntries));
 
-    setHasProcessingDocuments(documents.some((document) => document.extraction_status === "processing"));
+    setHasProcessingDocuments(documents.some((document) => getDocumentExtractionStatus(document) === "processing"));
   }
 
   useEffect(() => {
@@ -139,7 +139,7 @@ export default function SchemaPage({ params }: { params: { caseId: string } }) {
       <div className="space-y-6">
         {schemas.map((schema) => {
           const preview = schemaPreviews[schema.document_category];
-          const extractionStatus = preview?.document.extraction_status || "pending";
+          const extractionStatus = getDocumentExtractionStatus(preview?.document) || "pending";
 
           return (
             <div key={`${schema.document_category}-${schema.id}`} className="space-y-3">
