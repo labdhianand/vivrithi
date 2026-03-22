@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-import type { DocumentRecord, ExtractionRecord, PageRecord } from "@/lib/types";
+import type { DocumentRecord, ExtractionRecord, PageRecord, SelectedExtractionField } from "@/lib/types";
 import { getPageImageUrl } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -11,10 +11,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-
-function toNumber(value?: string | null) {
-  return value ? Number(value) : 0;
-}
 
 function nearbyPages(pages: PageRecord[], activePage: number) {
   if (pages.length <= 9) {
@@ -30,13 +26,26 @@ function nearbyPages(pages: PageRecord[], activePage: number) {
   return result.filter((entry, index, array) => array.findIndex((candidate) => candidate.id === entry.id) === index);
 }
 
+function toPageBox(extraction: ExtractionRecord) {
+  if (!extraction.bbox) {
+    return null;
+  }
+  return {
+    id: extraction.id,
+    x: extraction.bbox.x,
+    y: extraction.bbox.y,
+    width: extraction.bbox.width,
+    height: extraction.bbox.height,
+  };
+}
+
 export function PdfViewer({
   documentId,
   document,
   pages,
   activePage,
   extractions,
-  activeExtractionId,
+  selectedField,
   onSelectExtraction,
   onSelectPage,
 }: {
@@ -45,7 +54,7 @@ export function PdfViewer({
   pages: PageRecord[];
   activePage?: number;
   extractions: ExtractionRecord[];
-  activeExtractionId?: string;
+  selectedField?: SelectedExtractionField | null;
   onSelectExtraction?: (id: string) => void;
   onSelectPage?: (pageNumber: number) => void;
 }) {
@@ -54,6 +63,7 @@ export function PdfViewer({
   const [imageFailed, setImageFailed] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [pageInput, setPageInput] = useState(page?.page_number ? String(page.page_number) : "1");
+  const [pulseSelected, setPulseSelected] = useState(false);
 
   useEffect(() => {
     setImageFailed(false);
@@ -63,20 +73,53 @@ export function PdfViewer({
     }
   }, [documentId, page?.page_number]);
 
+  useEffect(() => {
+    if (!selectedField?.page || selectedField.page === page?.page_number) {
+      return;
+    }
+    onSelectPage?.(selectedField.page);
+  }, [onSelectPage, page?.page_number, selectedField?.page]);
+
+  useEffect(() => {
+    if (!selectedField?.fieldName) {
+      setPulseSelected(false);
+      return;
+    }
+    setPulseSelected(true);
+    const timeoutId = window.setTimeout(() => {
+      setPulseSelected(false);
+    }, 2000);
+    return () => window.clearTimeout(timeoutId);
+  }, [
+    selectedField?.bbox?.height,
+    selectedField?.bbox?.width,
+    selectedField?.bbox?.x,
+    selectedField?.bbox?.y,
+    selectedField?.extractionId,
+    selectedField?.fieldName,
+    selectedField?.page,
+  ]);
+
   const isPdf = Boolean(
     document?.mime_type === "application/pdf"
       || document?.original_filename?.toLowerCase().endsWith(".pdf"),
   );
 
   const pageExtractions = extractions
-    .filter((entry) => entry.source_page_number === page?.page_number && entry.bbox_x1)
-    .map((entry) => ({
-      id: entry.id,
-      x1: toNumber(entry.bbox_x1),
-      y1: toNumber(entry.bbox_y1),
-      x2: toNumber(entry.bbox_x2),
-      y2: toNumber(entry.bbox_y2),
-    }));
+    .filter((entry) => (entry.bbox?.page || entry.source_page_number) === page?.page_number)
+    .map(toPageBox)
+    .filter((entry): entry is NonNullable<ReturnType<typeof toPageBox>> => Boolean(entry));
+
+  const selectedBox =
+    selectedField?.page === page?.page_number && selectedField.bbox
+      ? {
+          id: selectedField.extractionId || `selected-${selectedField.fieldName}`,
+          x: selectedField.bbox.x,
+          y: selectedField.bbox.y,
+          width: selectedField.bbox.width,
+          height: selectedField.bbox.height,
+        }
+      : null;
 
   const visiblePages = useMemo(
     () => (page ? nearbyPages(pages, page.page_number) : pages.slice(0, 5)),
@@ -176,7 +219,7 @@ export function PdfViewer({
           <>
             {!imageLoaded && (
               <div className="absolute inset-0 flex items-center justify-center bg-[#050816]">
-                <p className="text-sm text-slate-dim">Rendering page preview…</p>
+                <p className="text-sm text-slate-dim">Rendering page preview...</p>
               </div>
             )}
             <img
@@ -186,13 +229,15 @@ export function PdfViewer({
               onError={() => setImageFailed(true)}
               onLoad={() => setImageLoaded(true)}
             />
-            {imageLoaded && (
+            {imageLoaded ? (
               <BBoxOverlay
                 boxes={pageExtractions}
-                activeId={activeExtractionId}
+                selectedBoxId={selectedField?.page === page.page_number ? selectedField.extractionId : undefined}
+                selectedBox={selectedBox}
+                pulseSelected={pulseSelected}
                 onSelect={onSelectExtraction}
               />
-            )}
+            ) : null}
           </>
         ) : (
           <div className="max-h-[75vh] overflow-auto p-5">
@@ -207,7 +252,13 @@ export function PdfViewer({
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-slate-dim">
-        <span>{canRenderImage ? "Bounding boxes are clickable on the rendered page." : "Image preview unavailable for this document type."}</span>
+        <span>
+          {selectedField?.page === page.page_number && !selectedField.bbox
+            ? "Selected field has page metadata only. No bounding box was returned for highlight."
+            : canRenderImage
+              ? "Click a field row to jump to its bounding box on the rendered page."
+              : "Image preview unavailable for this document type."}
+        </span>
         <span>{page.parser_used || "parser unknown"}</span>
       </div>
     </Card>

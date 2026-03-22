@@ -12,10 +12,10 @@ from ..models.case import Case
 from ..models.document import Document
 from ..models.extraction import Extraction
 from ..models.page import Page
-from ..schemas.extraction import ExtractionRead, ExtractionUpdate
+from ..schemas.extraction import DiscoveredFieldRead, ExtractionRead, ExtractionUpdate
 from ..services.document_pipeline import _build_extraction_model, parsed_pages_from_page_models
 from ..services.extractor import extract_with_schema
-from ..services.schema_manager import get_or_create_case_schema
+from ..services.schema_manager import discover_additional_fields, get_or_create_case_schema, get_standard_field_labels
 from ..services.storage import storage
 from ..services.types import ParsedPage
 
@@ -47,6 +47,36 @@ async def list_document_extractions(doc_id: str, session: AsyncSession = Depends
         select(Extraction).where(Extraction.document_id == doc_id).order_by(Extraction.schema_field_key)
     )
     return list(result.scalars().all())
+
+
+@router.post("/extraction/{doc_id}/discover", response_model=list[DiscoveredFieldRead])
+async def discover_document_fields(
+    doc_id: str,
+    session: AsyncSession = Depends(get_session),
+) -> list[DiscoveredFieldRead]:
+    document = await session.get(Document, doc_id)
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    category = document.user_category or document.auto_category
+    if not category:
+        raise HTTPException(status_code=400, detail="Document must be classified before discovery can run")
+
+    document_text = document.extracted_text or document.raw_markdown or document.classification_text or ""
+    if not document_text.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="Document text is not available yet. Wait for extraction to finish and retry.",
+        )
+
+    return [
+        DiscoveredFieldRead(**item)
+        for item in await discover_additional_fields(
+            category=category,
+            document_text=document_text,
+            existing_fields=get_standard_field_labels(category),
+        )
+    ]
 
 
 @router.patch("/extractions/{extraction_id}", response_model=ExtractionRead)

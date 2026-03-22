@@ -1,48 +1,89 @@
 "use client";
 
-import type { MouseEvent } from "react";
+import { useEffect, useRef } from "react";
+
+import { cn } from "@/lib/utils";
 
 interface Box {
   id: string;
-  x1: number;
-  y1: number;
-  x2: number;
-  y2: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
 }
 
 export function BBoxOverlay({
   boxes,
-  activeId,
+  selectedBoxId,
+  selectedBox,
+  pulseSelected = false,
   onSelect,
 }: {
   boxes: Box[];
-  activeId?: string;
+  selectedBoxId?: string;
+  selectedBox?: Box | null;
+  pulseSelected?: boolean;
   onSelect?: (id: string) => void;
 }) {
+  const selectedRef = useRef<HTMLButtonElement | HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!selectedRef.current) {
+      return;
+    }
+    selectedRef.current.scrollIntoView({ block: "center", inline: "center", behavior: "smooth" });
+  }, [selectedBoxId, selectedBox?.id]);
+
+  const shouldRenderStandaloneSelected =
+    selectedBox && !boxes.some((box) => box.id === selectedBox.id);
+
   return (
-    <svg className="absolute inset-0 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+    <div className="absolute inset-0">
       {boxes.map((box) => {
-        const isActive = activeId === box.id;
-        const handleClick = (event: MouseEvent<SVGRectElement>) => {
-          event.stopPropagation();
-          onSelect?.(box.id);
-        };
+        const isSelected = selectedBoxId === box.id;
         return (
-          <rect
+          <button
             key={box.id}
-            x={box.x1 * 100}
-            y={box.y1 * 100}
-            width={(box.x2 - box.x1) * 100}
-            height={(box.y2 - box.y1) * 100}
-            rx="0.6"
-            fill={isActive ? "rgba(6,182,212,0.18)" : "rgba(34,211,238,0.06)"}
-            stroke={isActive ? "#22d3ee" : "rgba(34,211,238,0.45)"}
-            strokeWidth={isActive ? 0.5 : 0.3}
-            className="cursor-pointer transition-all duration-200"
-            onClick={handleClick}
+            ref={isSelected ? (node) => { selectedRef.current = node; } : undefined}
+            type="button"
+            className={cn(
+              "absolute cursor-pointer rounded-[6px] border transition-all duration-200",
+              isSelected
+                ? "border-[#e91e8c] bg-[#e91e8c]/20"
+                : "border-[#4a1530] bg-transparent hover:border-[#7a2550]",
+              isSelected && pulseSelected && "animate-pulse",
+            )}
+            style={{
+              left: `${box.x * 100}%`,
+              top: `${box.y * 100}%`,
+              width: `${box.width * 100}%`,
+              height: `${box.height * 100}%`,
+            }}
+            onClick={(event) => {
+              event.stopPropagation();
+              onSelect?.(box.id);
+            }}
           />
         );
       })}
-    </svg>
+
+      {shouldRenderStandaloneSelected ? (
+        <div
+          ref={(node) => {
+            selectedRef.current = node;
+          }}
+          className={cn(
+            "absolute rounded-[6px] border-2 border-[#e91e8c] bg-[#e91e8c]/20",
+            pulseSelected && "animate-pulse",
+          )}
+          style={{
+            left: `${selectedBox.x * 100}%`,
+            top: `${selectedBox.y * 100}%`,
+            width: `${selectedBox.width * 100}%`,
+            height: `${selectedBox.height * 100}%`,
+          }}
+        />
+      ) : null}
+    </div>
   );
 }

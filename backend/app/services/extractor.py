@@ -1133,6 +1133,15 @@ def _coerce_confidence(value: Any, default: float = 0.75) -> float:
 
 
 def _coerce_bbox(value: Any) -> tuple[float, ...] | None:
+    if isinstance(value, dict):
+        try:
+            x = float(value.get("x"))
+            y = float(value.get("y"))
+            width = float(value.get("width"))
+            height = float(value.get("height"))
+        except (TypeError, ValueError):
+            return None
+        return (x, y, x + width, y + height)
     if not isinstance(value, (list, tuple)):
         return None
     coordinates: list[float] = []
@@ -1142,6 +1151,10 @@ def _coerce_bbox(value: Any) -> tuple[float, ...] | None:
         except (TypeError, ValueError):
             continue
     return tuple(coordinates) if coordinates else None
+
+
+def _normalize_lookup_key(value: Any) -> str:
+    return re.sub(r"[^a-z0-9]+", "", clean_text(value).lower())
 
 
 def _llm_has_signal(raw_value: Any, value_numeric: Any) -> bool:
@@ -1443,15 +1456,18 @@ async def _llm_extract(
     prompt = (
         "You are extracting structured data from an Indian financial document "
         "(NBFC/bank filing, credit rating, ALM disclosure, or shareholding pattern).\n\n"
-        "Return a JSON array where each element has: key, value, value_numeric, page_number, confidence, bbox.\n\n"
+        "Return a JSON array where each element has: key, field_name, value, value_numeric, page_number, confidence, bbox.\n"
+        "Use the exact schema key for key and the human label for field_name.\n"
+        "bbox must be either null or an object with normalized coordinates {x, y, width, height} between 0 and 1.\n"
+        "If exact location is unavailable, return page_number and bbox as null.\n\n"
         "Important conventions for Indian financial filings:\n"
         "- Amounts are typically in lakhs or crores (Rs. / INR)\n"
         "- Percentages should include the % symbol\n"
         "- Dates should be in DD-MM-YYYY format\n"
         "- Rating formats: CARE AA; Stable, ICRA A1+, CRISIL AAA/Stable\n\n"
         "Few-shot examples:\n"
-        '1. ALM (LCR): {"key":"lcr_ratio","value":"151.7%","value_numeric":151.7,"page_number":1,"confidence":0.95}\n'
-        '2. Shareholding: {"key":"promoter_holding_percent","value":"48.95%","value_numeric":48.95,"page_number":2,"confidence":0.93}\n\n'
+        '1. ALM (LCR): {"key":"lcr_ratio","field_name":"Liquidity Coverage Ratio (%)","value":"151.7%","value_numeric":151.7,"page_number":1,"confidence":0.95,"bbox":{"x":0.16,"y":0.31,"width":0.18,"height":0.03}}\n'
+        '2. Shareholding: {"key":"promoter_holding_percent","field_name":"Promoter Holding %","value":"48.95%","value_numeric":48.95,"page_number":2,"confidence":0.93,"bbox":null}\n\n'
         f"Fields:\n{fields_description}\n\nDocument:\n{context}"
     )
     try:
@@ -1471,7 +1487,24 @@ async def extract_with_schema(
     llm_results = await _llm_extract(document_markdown, schema, pages=pages)
     page_lines = {page.page_number: _page_lines(page) for page in pages}
     specific_values = _schema_specific_values(schema, pages, page_lines)
-    llm_by_key = {item["key"]: item for item in llm_results or [] if "key" in item}
+    schema_lookup = {
+        _normalize_lookup_key(field["key"]): field["key"]
+        for field in schema["fields"]
+    }
+    schema_lookup.update(
+        {
+            _normalize_lookup_key(field["label"]): field["key"]
+            for field in schema["fields"]
+        }
+    )
+    llm_by_key: dict[str, dict[str, Any]] = {}
+    for item in llm_results or []:
+        if not isinstance(item, dict):
+            continue
+        candidate_key = item.get("key") or item.get("field_name")
+        mapped_key = schema_lookup.get(_normalize_lookup_key(candidate_key))
+        if mapped_key:
+            llm_by_key[mapped_key] = item
     results: list[ExtractionResult] = []
 
     for field in schema["fields"]:

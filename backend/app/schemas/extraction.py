@@ -3,7 +3,22 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, computed_field
+
+
+class ExtractionBBoxRead(BaseModel):
+    page: int
+    x: float
+    y: float
+    width: float
+    height: float
+
+
+class DiscoveredFieldRead(BaseModel):
+    field_name: str
+    field_type: str
+    value_found: str
+    reason: str
 
 
 class ExtractionRead(BaseModel):
@@ -33,6 +48,25 @@ class ExtractionRead(BaseModel):
     cell_reference: str | None = None
     created_at: datetime
     updated_at: datetime
+
+    @computed_field(return_type=ExtractionBBoxRead | None)
+    @property
+    def bbox(self) -> ExtractionBBoxRead | None:
+        if (
+            self.source_page_number is None
+            or self.bbox_x1 is None
+            or self.bbox_y1 is None
+            or self.bbox_x2 is None
+            or self.bbox_y2 is None
+        ):
+            return None
+        return ExtractionBBoxRead(
+            page=self.source_page_number,
+            x=float(self.bbox_x1),
+            y=float(self.bbox_y1),
+            width=max(0.0, float(self.bbox_x2) - float(self.bbox_x1)),
+            height=max(0.0, float(self.bbox_y2) - float(self.bbox_y1)),
+        )
 
 
 class ExtractionUpdate(BaseModel):

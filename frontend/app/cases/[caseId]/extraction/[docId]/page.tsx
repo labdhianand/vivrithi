@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
 import { getDocument, listExtractions, listPages, rerunExtraction, updateExtraction } from "@/lib/api";
-import type { DocumentRecord, ExtractionRecord, PageRecord } from "@/lib/types";
+import { toSelectedExtractionField } from "@/lib/extraction-highlight";
+import type { DocumentRecord, ExtractionRecord, PageRecord, SelectedExtractionField } from "@/lib/types";
 import { ExtractedDataTable } from "@/components/extraction/extracted-data-table";
 import { PdfViewer } from "@/components/extraction/pdf-viewer";
 import { Button } from "@/components/ui/button";
@@ -15,7 +16,7 @@ export default function DocumentExtractionPage({ params }: { params: { caseId: s
   const [pages, setPages] = useState<PageRecord[]>([]);
   const [extractions, setExtractions] = useState<ExtractionRecord[]>([]);
   const [activePage, setActivePage] = useState<number | undefined>(undefined);
-  const [activeExtractionId, setActiveExtractionId] = useState<string | undefined>(undefined);
+  const [selectedField, setSelectedField] = useState<SelectedExtractionField | null>(null);
   const [busy, setBusy] = useState(false);
 
   const refresh = async () => {
@@ -38,7 +39,10 @@ export default function DocumentExtractionPage({ params }: { params: { caseId: s
     const extractionId = searchParams.get("extractionId");
     const page = searchParams.get("page");
     if (extractionId) {
-      setActiveExtractionId(extractionId);
+      const extraction = extractions.find((item) => item.id === extractionId);
+      if (extraction) {
+        setSelectedField(toSelectedExtractionField(extraction));
+      }
     }
     if (page) {
       const pageNumber = Number(page);
@@ -46,14 +50,7 @@ export default function DocumentExtractionPage({ params }: { params: { caseId: s
         setActivePage(pageNumber);
       }
     }
-  }, [searchParams]);
-
-  useEffect(() => {
-    const current = extractions.find((item) => item.id === activeExtractionId);
-    if (current?.source_page_number) {
-      setActivePage(current.source_page_number);
-    }
-  }, [activeExtractionId, extractions]);
+  }, [extractions, searchParams]);
 
   return (
     <div className="space-y-5">
@@ -91,14 +88,25 @@ export default function DocumentExtractionPage({ params }: { params: { caseId: s
           pages={pages}
           activePage={activePage}
           extractions={extractions}
-          activeExtractionId={activeExtractionId}
-          onSelectExtraction={setActiveExtractionId}
+          selectedField={selectedField}
+          onSelectExtraction={(extractionId) => {
+            const extraction = extractions.find((item) => item.id === extractionId);
+            const nextSelection = extraction ? toSelectedExtractionField(extraction) : null;
+            if (!nextSelection) {
+              return;
+            }
+            setSelectedField(nextSelection);
+            setActivePage(nextSelection.page);
+          }}
           onSelectPage={setActivePage}
         />
         <ExtractedDataTable
           extractions={extractions}
-          activeExtractionId={activeExtractionId}
-          onHighlight={setActiveExtractionId}
+          selectedExtractionId={selectedField?.extractionId}
+          onSelectField={(field) => {
+            setSelectedField(field);
+            setActivePage(field.page);
+          }}
           onSave={async (extractionId, value) => {
             await updateExtraction(extractionId, { user_edited_value: value, user_verified: true });
             await refresh();

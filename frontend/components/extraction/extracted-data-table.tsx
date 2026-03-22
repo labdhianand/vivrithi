@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 
-import type { ExtractionRecord } from "@/lib/types";
+import type { ExtractionRecord, SelectedExtractionField } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { getExtractionFieldLabel, hasExtractionBBox, toSelectedExtractionField } from "@/lib/extraction-highlight";
 import { ConfidenceBadge } from "@/components/extraction/confidence-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,13 +13,13 @@ import { Input } from "@/components/ui/input";
 
 export function ExtractedDataTable({
   extractions,
-  activeExtractionId,
-  onHighlight,
+  selectedExtractionId,
+  onSelectField,
   onSave,
 }: {
   extractions: ExtractionRecord[];
-  activeExtractionId?: string;
-  onHighlight?: (id: string) => void;
+  selectedExtractionId?: string;
+  onSelectField?: (field: SelectedExtractionField) => void;
   onSave: (extractionId: string, value: string) => Promise<void>;
 }) {
   const [drafts, setDrafts] = useState<Record<string, string>>({});
@@ -38,6 +39,13 @@ export function ExtractedDataTable({
     setSaving(null);
   };
 
+  const handleSelect = (entry: ExtractionRecord) => {
+    const selection = toSelectedExtractionField(entry);
+    if (selection) {
+      onSelectField?.(selection);
+    }
+  };
+
   return (
     <Card className="overflow-hidden border-[#4a1530] bg-[#1f0d16]">
       <div className="mb-5 flex items-center justify-between">
@@ -55,29 +63,30 @@ export function ExtractedDataTable({
 
       <div className="space-y-0 divide-y divide-[#4a1530]">
         {extractions.map((entry, index) => {
-          const isActive = activeExtractionId === entry.id;
+          const isActive = selectedExtractionId === entry.id;
           const isEdited = entry.user_verified;
           const isMissingRequired = entry.extraction_method === "missing_required";
           const isMissing = !entry.user_edited_value && !entry.value;
+
           return (
             <div
               key={entry.id}
               className={cn(
-                "rounded-lg p-4 transition-all duration-200",
+                "cursor-pointer border-l-2 p-4 transition-all duration-200",
                 isActive
-                  ? "border border-accent/30 bg-accent/[0.06]"
+                  ? "border-[#e91e8c] bg-[#3d1a2a]"
                   : index % 2 === 0
-                    ? "bg-[#2d1420]/60"
-                    : "bg-transparent",
+                    ? "border-transparent bg-[#2d1420]/60"
+                    : "border-transparent bg-transparent",
                 !isActive && "hover:bg-[#2d1420]",
               )}
-              onMouseEnter={() => onHighlight?.(entry.id)}
+              onClick={() => handleSelect(entry)}
             >
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="font-medium text-slate-bright">
-                      {entry.field_label || entry.schema_field_key}
+                      {getExtractionFieldLabel(entry)}
                     </span>
                     {isEdited && <Badge tone="success">Verified</Badge>}
                     {isMissingRequired && <Badge tone="danger">Required Missing</Badge>}
@@ -97,7 +106,7 @@ export function ExtractedDataTable({
                     {entry.extraction_method && (
                       <Badge tone="neutral">{entry.extraction_method}</Badge>
                     )}
-                    {(entry.bbox_x1 || entry.bbox_y1 || entry.bbox_x2 || entry.bbox_y2) && (
+                    {hasExtractionBBox(entry) && (
                       <Badge tone="neutral">Boxed</Badge>
                     )}
                   </div>
@@ -105,17 +114,18 @@ export function ExtractedDataTable({
                 <ConfidenceBadge confidence={entry.confidence} />
               </div>
 
-              {isMissingRequired && (
+              {isMissingRequired ? (
                 <div className="mt-3 rounded-xl border border-rose-400/20 bg-rose-500/[0.08] px-3 py-2 text-sm text-rose-100">
                   This compulsory field could not be extracted reliably from the source document and needs manual review.
                 </div>
-              )}
+              ) : null}
 
               <div className="mt-3 flex items-end gap-3">
                 <div className="flex-1">
                   <Input
                     value={drafts[entry.id] || ""}
                     placeholder={isMissing ? "No extracted value" : undefined}
+                    onClick={(event) => event.stopPropagation()}
                     onChange={(event) => setDrafts((current) => ({ ...current, [entry.id]: event.target.value }))}
                   />
                 </div>
@@ -123,7 +133,10 @@ export function ExtractedDataTable({
                   variant="secondary"
                   size="sm"
                   disabled={!entry.source_page_number}
-                  onClick={() => onHighlight?.(entry.id)}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    handleSelect(entry);
+                  }}
                 >
                   Locate
                 </Button>
@@ -131,9 +144,12 @@ export function ExtractedDataTable({
                   variant="primary"
                   size="sm"
                   disabled={saving === entry.id}
-                  onClick={() => handleSave(entry.id)}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    void handleSave(entry.id);
+                  }}
                 >
-                  {saving === entry.id ? "Saving\u2026" : "Save"}
+                  {saving === entry.id ? "Saving..." : "Save"}
                 </Button>
               </div>
             </div>
@@ -141,11 +157,11 @@ export function ExtractedDataTable({
         })}
       </div>
 
-      {extractions.length === 0 && (
+      {extractions.length === 0 ? (
         <div className="py-8 text-center">
           <p className="text-sm text-slate-dim">No extractions available.</p>
         </div>
-      )}
+      ) : null}
     </Card>
   );
 }

@@ -4,6 +4,7 @@ import type {
   AnalysisSummary,
   CaseRecord,
   CrossCheck,
+  DiscoveredSchemaField,
   DocumentRecord,
   EvidenceRef,
   ExtractionRecord,
@@ -36,6 +37,45 @@ const SERVER_API_BASE = (
 
 function buildApiUrl(path: string): string {
   return typeof window === "undefined" ? `${SERVER_API_BASE}${path}` : path;
+}
+
+function toNumericValue(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
+function normalizeExtraction(record: ExtractionRecord): ExtractionRecord {
+  if (record.bbox) {
+    return record;
+  }
+  const page = typeof record.source_page_number === "number" ? record.source_page_number : null;
+  const x1 = toNumericValue(record.bbox_x1);
+  const y1 = toNumericValue(record.bbox_y1);
+  const x2 = toNumericValue(record.bbox_x2);
+  const y2 = toNumericValue(record.bbox_y2);
+  if (page === null || x1 === null || y1 === null || x2 === null || y2 === null) {
+    return { ...record, bbox: null };
+  }
+  return {
+    ...record,
+    bbox: {
+      page,
+      x: x1,
+      y: y1,
+      width: Math.max(0, x2 - x1),
+      height: Math.max(0, y2 - y1),
+    },
+  };
+}
+
+function normalizeExtractions(records: ExtractionRecord[]) {
+  return records.map(normalizeExtraction);
 }
 
 function parseErrorMessage(message: string, status: number): string {
@@ -170,7 +210,7 @@ export async function listPages(documentId: string) {
 }
 
 export async function listExtractions(documentId: string) {
-  return request<ExtractionRecord[]>(`/api/documents/${documentId}/extractions`);
+  return normalizeExtractions(await request<ExtractionRecord[]>(`/api/documents/${documentId}/extractions`));
 }
 
 export async function listCandidates(..._args: unknown[]): Promise<LegacyExtractionCandidate[]> {
@@ -183,14 +223,20 @@ export async function selectCandidate(..._args: unknown[]): Promise<LegacyExtrac
 }
 
 export async function updateExtraction(extractionId: string, payload: Partial<ExtractionRecord>) {
-  return request<ExtractionRecord>(`/api/extractions/${extractionId}`, {
+  return normalizeExtraction(await request<ExtractionRecord>(`/api/extractions/${extractionId}`, {
     method: "PATCH",
     body: JSON.stringify(payload),
-  });
+  }));
 }
 
 export async function rerunExtraction(documentId: string) {
-  return request<ExtractionRecord[]>(`/api/documents/${documentId}/extract`, {
+  return normalizeExtractions(await request<ExtractionRecord[]>(`/api/documents/${documentId}/extract`, {
+    method: "POST",
+  }));
+}
+
+export async function discoverExtractionFields(documentId: string) {
+  return request<DiscoveredSchemaField[]>(`/api/extraction/${documentId}/discover`, {
     method: "POST",
   });
 }

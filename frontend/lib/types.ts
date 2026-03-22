@@ -97,8 +97,36 @@ export interface ExtractionRecord {
   extraction_method?: string | null;
   user_verified: boolean;
   user_edited_value?: string | null;
+  correction_type?: string | null;
+  sheet_name?: string | null;
+  row_label?: string | null;
+  column_header?: string | null;
+  cell_reference?: string | null;
+  bbox?: ExtractionBBox | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface ExtractionBBox {
+  page: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface SelectedExtractionField {
+  extractionId?: string;
+  fieldName: string;
+  page: number;
+  bbox: ExtractionBBox | null;
+}
+
+export interface DiscoveredSchemaField {
+  field_name: string;
+  field_type: "Number" | "Text" | "Percentage" | "Date" | string;
+  value_found: string;
+  reason: string;
 }
 
 export interface SchemaField {

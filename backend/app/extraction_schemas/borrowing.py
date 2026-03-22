@@ -15,22 +15,16 @@ BORROWING_DEFAULT_SCHEMA = {
         },
         {"key": "term_loan_total_crore", "label": "Term Loan Total (Rs. crore)", "type": "currency_crore"},
         {"key": "ncd_total_crore", "label": "NCD Total (Rs. crore)", "type": "currency_crore"},
-        {"key": "cp_total_crore", "label": "Commercial Paper Total (Rs. crore)", "type": "currency_crore"},
-        {"key": "fund_based_limits_crore", "label": "Fund-Based Limits (Rs. crore)", "type": "currency_crore"},
-        {
-            "key": "lender_wise_breakdown",
-            "label": "Lender-Wise Breakdown",
-            "type": "json",
-            "description": "Array of {lender_name, facility_type, amount_crore}",
-        },
-        {
-            "key": "ncd_instruments",
-            "label": "NCD Instrument Details",
-            "type": "json",
-            "description": "Array of {isin, coupon_rate, maturity_date, amount_crore}",
-        },
         {"key": "key_rating_strengths", "label": "Key Rating Strengths", "type": "text"},
         {"key": "key_rating_concerns", "label": "Key Rating Concerns", "type": "text"},
+        {"key": "total_outstanding_debt_crore", "label": "Total Outstanding Debt (Cr)", "type": "currency_crore"},
+        {"key": "number_of_lenders", "label": "Number of Lenders", "type": "number"},
+        {
+            "key": "average_cost_of_borrowing_percent",
+            "label": "Average Cost of Borrowing %",
+            "type": "percentage",
+        },
+        {"key": "nearest_repayment_date", "label": "Nearest Repayment Date", "type": "date"},
     ],
 }
 
