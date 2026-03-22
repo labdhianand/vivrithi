@@ -52,6 +52,7 @@ export function SchemaEditor({
   extractionPreview,
   previewDocumentName,
   previewDocumentId,
+  schemaId,
   onSave,
   onRunExtraction,
   onUpdateExtraction,
@@ -61,6 +62,7 @@ export function SchemaEditor({
   extractionPreview?: Record<string, ExtractionRecord>;
   previewDocumentName?: string | null;
   previewDocumentId?: string | null;
+  schemaId?: string;
   onSave: (fields: SchemaField[]) => Promise<void>;
   onRunExtraction?: () => Promise<void>;
   onUpdateExtraction?: (extractionId: string, value: string) => Promise<void>;
@@ -76,8 +78,10 @@ export function SchemaEditor({
   const [draftValue, setDraftValue] = useState("");
   const [saveNotice, setSaveNotice] = useState<string | null>(null);
 
+  const rootId = schemaId ? `schema-${schemaId}` : `schema-${category}`;
+
   return (
-    <div className="rounded-xl border border-[#4a1530] bg-[#1f0d16] p-6 shadow-sm" id={`schema-${category}`}>
+    <div className="rounded-xl border border-[#4a1530] bg-[#1f0d16] p-6 shadow-sm" id={rootId}>
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <h3 className="text-xl font-semibold text-[#fce4ec]">{category.replace(/_/g, " ")}</h3>

@@ -113,8 +113,8 @@ export async function getDocumentExtractionStatus(documentId: string) {
   return request<DocumentExtractionStatusRecord>(`/api/documents/${documentId}/extraction-status`);
 }
 
-export async function deleteDocument(documentId: string) {
-  return request<void>(`/api/documents/${documentId}`, {
+export async function deleteDocument(docId: string) {
+  return request<void>(`/api/documents/${docId}`, {
     method: "DELETE",
   });
 }

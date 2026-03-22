@@ -169,6 +169,7 @@ export default function SchemaPage({ params }: { params: { caseId: string } }) {
               ) : null}
 
               <SchemaEditor
+                schemaId={schema.id}
                 category={schema.document_category}
                 initialFields={schema.fields as SchemaField[]}
                 extractionPreview={preview?.extractionMap}
