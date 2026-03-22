@@ -8,9 +8,43 @@ const FIELD_TYPES = [
   { value: "text", label: "Text" },
   { value: "number", label: "Number" },
   { value: "percentage", label: "Percentage" },
+  { value: "currency_lakhs", label: "Currency (Lakhs)" },
   { value: "currency_crore", label: "Currency (Cr)" },
   { value: "date", label: "Date" },
 ] as const;
+
+const DEFAULT_FIELDS_BY_CATEGORY: Record<string, SchemaField[]> = {
+  GST_Returns: [
+    { key: "gstin", label: "GSTIN", type: "text", required: true },
+    { key: "filing_period", label: "Filing Period", type: "text", required: true },
+    { key: "gross_turnover_crore", label: "Gross Turnover (Cr)", type: "number", required: true },
+    { key: "taxable_turnover_crore", label: "Taxable Turnover (Cr)", type: "number", required: true },
+    { key: "total_tax_paid_crore", label: "Total Tax Paid (Cr)", type: "number", required: false },
+    { key: "input_tax_credit_crore", label: "Input Tax Credit (Cr)", type: "number", required: false },
+  ],
+  ITR: [
+    { key: "pan", label: "PAN", type: "text", required: true },
+    { key: "assessment_year", label: "Assessment Year", type: "text", required: true },
+    { key: "gross_total_income_crore", label: "Gross Total Income (Cr)", type: "number", required: true },
+    { key: "total_deductions_crore", label: "Total Deductions (Cr)", type: "number", required: false },
+    { key: "taxable_income_crore", label: "Taxable Income (Cr)", type: "number", required: true },
+    { key: "tax_paid_crore", label: "Tax Paid (Cr)", type: "number", required: false },
+  ],
+  Bank_Statement: [
+    { key: "bank_name", label: "Bank Name", type: "text", required: true },
+    { key: "account_holder", label: "Account Holder", type: "text", required: true },
+    { key: "period", label: "Period", type: "text", required: true },
+    { key: "opening_balance_crore", label: "Opening Balance (Cr)", type: "number", required: false },
+    { key: "closing_balance_crore", label: "Closing Balance (Cr)", type: "number", required: true },
+    { key: "total_credits_crore", label: "Total Credits (Cr)", type: "number", required: true },
+    { key: "total_debits_crore", label: "Total Debits (Cr)", type: "number", required: true },
+    { key: "average_monthly_balance_crore", label: "Average Monthly Balance (Cr)", type: "number", required: false },
+  ],
+};
+
+function cloneFields(fields: SchemaField[]) {
+  return fields.map((field) => ({ ...field }));
+}
 
 export function SchemaEditor({
   category,
@@ -31,7 +65,9 @@ export function SchemaEditor({
   onRunExtraction?: () => Promise<void>;
   onUpdateExtraction?: (extractionId: string, value: string) => Promise<void>;
 }) {
-  const [fields, setFields] = useState<SchemaField[]>(() => initialFields);
+  const [fields, setFields] = useState<SchemaField[]>(() =>
+    cloneFields(initialFields.length > 0 ? initialFields : DEFAULT_FIELDS_BY_CATEGORY[category] || []),
+  );
   const [saving, setSaving] = useState(false);
   const [extracting, setExtracting] = useState(false);
   const [newFieldLabel, setNewFieldLabel] = useState("");

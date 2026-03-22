@@ -7,12 +7,20 @@ import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 const links = [
+  { href: "/dashboard", label: "Dashboard", icon: "dashboard" },
   { href: "/", label: "Command Center", icon: "grid" },
   { href: "/onboarding", label: "New Case", icon: "plus" },
   { href: "/cases", label: "Case Pipeline", icon: "layers" },
 ];
 
 const icons: Record<string, ReactNode> = {
+  dashboard: (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+      <path d="M2 3.5A1.5 1.5 0 0 1 3.5 2h9A1.5 1.5 0 0 1 14 3.5v9A1.5 1.5 0 0 1 12.5 14h-9A1.5 1.5 0 0 1 2 12.5v-9Z" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M2 6.5h12" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M6 9.5h2M6 12h5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  ),
   grid: (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
       <rect x="1" y="1" width="6" height="6" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
@@ -90,7 +98,7 @@ export function Sidebar() {
         </p>
       </div>
 
-      <div className="text-[10px] font-medium uppercase tracking-[0.18em] text-[#ad6883]">v1.0 · Powered by Gemini + GBM</div>
+      <div className="text-[10px] font-medium uppercase tracking-[0.18em] text-[#ad6883]">v1.0 - Powered by Gemini + GBM</div>
     </aside>
   );
 }

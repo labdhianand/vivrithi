@@ -95,10 +95,14 @@ def _gst_return_turnover(extractions: list[Extraction], return_type_term: str) -
 
     normalized_term = return_type_term.lower().replace("-", "").replace(" ", "")
     for fields in grouped.values():
+        sample_extraction = next(iter(fields.values()), None)
+        filename = (
+            getattr(getattr(sample_extraction, "document", None), "original_filename", "") if sample_extraction else ""
+        )
         return_type = _active_value(fields.get("return_type")) or ""
-        normalized_type = return_type.lower().replace("-", "").replace(" ", "")
+        normalized_type = f"{return_type} {filename}".lower().replace("-", "").replace(" ", "")
         if normalized_term in normalized_type:
-            turnover = fields.get("turnover_reported")
+            turnover = fields.get("gross_turnover") or fields.get("turnover_reported") or fields.get("taxable_turnover")
             if turnover and _active_numeric(turnover) is not None:
                 return turnover
 
@@ -400,7 +404,11 @@ def cross_verify(case_or_case_id: Case | str, documents: list[Document], extract
     revenue_ext = _pick(extractions, "Annual_Report", "total_revenue_crore")
     if not revenue_ext:
         revenue_ext = _pick(extractions, "Portfolio_Performance", "total_revenue_operations")
-    gst_turnover = _pick(extractions, "GST_Returns", "turnover_reported")
+    gst_turnover = (
+        _pick(extractions, "GST_Returns", "gross_turnover")
+        or _pick(extractions, "GST_Returns", "turnover_reported")
+        or _pick(extractions, "GST_Returns", "taxable_turnover")
+    )
     if revenue_ext and _active_value(revenue_ext):
         if gst_turnover and _active_numeric(gst_turnover) and _active_numeric(revenue_ext):
             rev_val = _active_numeric(revenue_ext)

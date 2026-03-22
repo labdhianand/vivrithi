@@ -32,4 +32,7 @@ export const DOCUMENT_CATEGORIES = [
   "Borrowing_Profile",
   "Annual_Report",
   "Portfolio_Performance",
+  "GST_Returns",
+  "ITR",
+  "Bank_Statement",
 ] as const;

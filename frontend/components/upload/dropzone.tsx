@@ -3,7 +3,6 @@
 import { useRef, useState } from "react";
 
 import type { DocumentRecord } from "@/lib/types";
-import { Button } from "@/components/ui/button";
 
 type DropzoneState = "empty" | "uploading" | "classifying" | "complete" | "error";
 
@@ -15,27 +14,28 @@ function formatBytes(bytes: number | null | undefined) {
 }
 
 function formatCategory(category: string | null | undefined) {
-  if (!category) return "Pending classification";
-
-  switch (category) {
-    case "ALM":
-      return "ALM Report";
-    case "Shareholding_Pattern":
-      return "Shareholding Pattern";
-    case "Borrowing_Profile":
-      return "Borrowing Profile";
-    case "Annual_Report":
-      return "Annual Report";
-    case "Portfolio_Performance":
-      return "Portfolio Performance";
-    default:
-      return category.replace(/_/g, " ");
+  if (!category) {
+    return "Pending classification";
   }
+
+  return category
+    .split(/[_\s]+/)
+    .filter(Boolean)
+    .map((part) => (part.toUpperCase() === part ? part : `${part[0].toUpperCase()}${part.slice(1).toLowerCase()}`))
+    .join(" ");
 }
 
 function formatConfidence(confidence: string | null | undefined) {
-  if (!confidence) return null;
-  return `${Math.round(Number(confidence) * 100)}% confident`;
+  if (!confidence) {
+    return null;
+  }
+
+  const numericConfidence = Number(confidence);
+  if (Number.isNaN(numericConfidence)) {
+    return null;
+  }
+
+  return `${Math.round(numericConfidence * 100)}%`;
 }
 
 function stageLabel(document?: DocumentRecord | null) {
@@ -47,17 +47,16 @@ function stageLabel(document?: DocumentRecord | null) {
     case "parsing":
       return "Reading pages and extracting text";
     case "classifying":
-      return "Classifying document...";
+      return "Classifying document";
     case "extracting":
-      return "Preparing extraction after classification";
+      return "Preparing extraction";
     default:
-      return "Classifying document...";
+      return "Extraction running in background";
   }
 }
 
 export function Dropzone({
-  title,
-  description,
+  label,
   state,
   error,
   document,
@@ -67,8 +66,7 @@ export function Dropzone({
   onReplace,
   onRetry,
 }: {
-  title: string;
-  description: string;
+  label: string;
   state: DropzoneState;
   error?: string | null;
   document?: DocumentRecord | null;
@@ -81,10 +79,11 @@ export function Dropzone({
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [dragActive, setDragActive] = useState(false);
 
-  const activeFileName = file?.name || document?.original_filename || "Untitled document";
+  const activeFileName = file?.name || document?.original_filename || label;
   const activeFileSize = file?.size ?? document?.file_size_bytes;
-  const confidenceLabel = formatConfidence(document?.auto_category_confidence);
-  const showDropzone = state === "empty" || state === "error";
+  const activeCategory = document?.doc_type || document?.auto_category || document?.user_category;
+  const confidenceLabel = formatConfidence(document?.auto_category_confidence || document?.confidence);
+  const showPicker = state === "empty" || state === "error";
 
   function openPicker() {
     inputRef.current?.click();
@@ -94,34 +93,32 @@ export function Dropzone({
     if (!nextFile) {
       return;
     }
+
     onFileSelect(nextFile);
   }
 
+  const borderClass = dragActive
+    ? "border-[#e91e8c]"
+    : state === "complete"
+      ? "border-emerald-500"
+      : state === "uploading" || state === "classifying"
+        ? "border-[#e91e8c]"
+        : state === "error"
+          ? "border-red-500"
+          : "border-[#4a1530] border-dashed";
+
   return (
-    <div className="panel border-gradient flex h-full flex-col p-5">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-slate-dim">Required section</p>
-          <h3 className="mt-2 text-lg font-semibold text-slate-bright">{title}</h3>
-          <p className="mt-1 text-sm text-slate-dim">{description}</p>
-        </div>
-        {state === "complete" ? (
-          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald/15 text-emerald-glow">
-            <svg className="h-5 w-5" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M5 10.5 8.5 14 15 6.5" />
-            </svg>
-          </span>
-        ) : null}
-      </div>
+    <div className={`relative flex min-h-[260px] flex-col rounded-xl border-2 bg-[#1f0d16] p-6 transition-colors ${borderClass}`}>
+      {state === "complete" ? (
+        <span className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-300">
+          <svg className="h-4 w-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5 10.5 8.5 14 15 6.5" />
+          </svg>
+        </span>
+      ) : null}
 
-      {showDropzone ? (
-        <div className="mt-5 flex flex-1 flex-col">
-          {state === "error" ? (
-            <div className="mb-3 rounded-2xl border border-rose/30 bg-rose/[0.12] px-4 py-3 text-sm text-rose-glow">
-              {error || "Upload or classification failed. Try again."}
-            </div>
-          ) : null}
-
+      {showPicker ? (
+        <>
           <button
             type="button"
             onClick={openPicker}
@@ -138,120 +135,103 @@ export function Dropzone({
               setDragActive(false);
               handleSelectedFile(Array.from(event.dataTransfer.files)[0]);
             }}
-            className={`flex flex-1 flex-col items-center justify-center rounded-2xl border border-dashed px-4 py-10 text-center transition-all duration-200 ${
-              dragActive
-                ? "border-accent/70 bg-accent/[0.12]"
-                  : state === "error"
-                  ? "border-rose/40 bg-rose/[0.06]"
-                  : "border-[#4a1530] bg-[#2d1420]/40 hover:border-[#7a2550] hover:bg-[#2d1420]/70"
-            }`}
+            className="flex flex-1 flex-col items-center justify-center text-center"
           >
-            <span className="text-sm font-semibold text-slate-bright">Drag &amp; drop or click to browse</span>
-            <span className="mt-2 text-xs text-slate-dim">Accepts .pdf .xlsx .xls .png .jpg .jpeg</span>
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" className="text-[#ad6883]">
+              <path d="M7 17.5A4.5 4.5 0 1 1 8.6 8.8 5.5 5.5 0 0 1 19 11a4 4 0 0 1-.5 8H13" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M12 20V11m0 0-3 3m3-3 3 3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <span className="mt-4 text-sm text-[#ad6883]">{label}</span>
+            <span className="mt-2 text-xs text-[#7a2550]">Drop any financial document</span>
           </button>
 
           {state === "error" ? (
-            <div className="mt-3">
-              <Button type="button" variant="secondary" size="sm" onClick={onRetry}>
+            <div className="mt-4 text-left">
+              <p className="truncate text-sm font-medium text-[#fce4ec]">{activeFileName}</p>
+              {activeFileSize ? <p className="mt-1 text-xs text-[#ad6883]">{formatBytes(activeFileSize)}</p> : null}
+              <p className="mt-3 text-sm text-red-400">{error || "Upload or classification failed."}</p>
+              <button
+                type="button"
+                onClick={onRetry}
+                className="mt-4 rounded-lg border border-red-500/50 px-3 py-2 text-sm font-medium text-red-300 transition-colors hover:bg-red-950/40"
+              >
                 Try again
-              </Button>
+              </button>
             </div>
           ) : null}
-        </div>
+        </>
       ) : null}
 
       {state === "uploading" ? (
-        <div className="mt-5 rounded-2xl border border-accent/25 bg-accent/[0.12] p-4">
-          <p className="truncate text-sm font-semibold text-slate-bright">{activeFileName}</p>
-          <div className="mt-4 flex items-center gap-3 text-sm text-[#f48fb1]">
+        <div className="flex flex-1 flex-col justify-center">
+          <p className="truncate pr-8 text-sm font-medium text-[#fce4ec]">{activeFileName}</p>
+          {activeFileSize ? <p className="mt-1 text-xs text-[#ad6883]">{formatBytes(activeFileSize)}</p> : null}
+          <div className="mt-4 flex items-center gap-3 text-[#f48fb1]">
             <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#ff6bb5]/30 border-t-[#ff6bb5]" />
-            <span>Uploading...</span>
-          </div>
-          <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-[#2d1420]">
-            <div className="h-full w-2/5 animate-pulse rounded-full bg-accent" />
+            <span className="text-sm font-medium">Uploading...</span>
           </div>
         </div>
       ) : null}
 
       {state === "classifying" ? (
-        <div className="mt-5 rounded-2xl border border-[#7a2550]/50 bg-[#e91e8c]/10 p-4">
-          <p className="truncate text-sm font-semibold text-slate-bright">{activeFileName}</p>
-          <p className="mt-1 text-xs text-slate-dim">{formatBytes(activeFileSize)}</p>
-
-          <div className="mt-4 flex items-center gap-3 text-sm text-[#f48fb1]">
+        <div className="flex flex-1 flex-col justify-center">
+          <p className="truncate pr-8 text-sm font-medium text-[#fce4ec]">{activeFileName}</p>
+          {activeFileSize ? <p className="mt-1 text-xs text-[#ad6883]">{formatBytes(activeFileSize)}</p> : null}
+          <div className="mt-4 flex items-center gap-3 text-[#f48fb1]">
             <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#ff6bb5]/30 border-t-[#ff6bb5]" />
-            <span>Classifying document...</span>
-          </div>
-
-          <p className="mt-2 text-xs text-slate-dim">{stageLabel(document)}</p>
-
-          <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-[#2d1420]">
-            <div
-              className="h-full rounded-full bg-[#ff6bb5] transition-all duration-500"
-              style={{ width: `${Math.max(document?.progress_percent || 12, 12)}%` }}
-            />
+            <span className="text-sm font-medium">Classifying...</span>
           </div>
         </div>
       ) : null}
 
       {state === "complete" ? (
-        <div className="mt-5 rounded-2xl border border-emerald/25 bg-emerald/[0.08] p-4">
-          <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-slate-bright">{activeFileName}</p>
-              <p className="mt-1 text-xs text-slate-dim">{formatBytes(activeFileSize)}</p>
-            </div>
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald/15 text-emerald-glow">
-              <svg className="h-4 w-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 10.5 8.5 14 15 6.5" />
-              </svg>
-            </span>
-          </div>
+        <div className="flex flex-1 flex-col">
+          <p className="truncate pr-8 text-sm font-medium text-[#fce4ec]">{activeFileName}</p>
+          {activeFileSize ? <p className="mt-1 text-xs text-[#ad6883]">{formatBytes(activeFileSize)}</p> : null}
 
-          <div className="mt-4 flex flex-wrap items-center gap-3">
-            <span className="inline-flex items-center rounded-full bg-[#3d1a2a] px-3 py-1 text-xs font-semibold text-[#ff6bb5]">
-              {formatCategory(document?.doc_type || document?.auto_category || document?.user_category)}
-              {confidenceLabel ? ` - ${confidenceLabel}` : ""}
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <span className="inline-flex rounded-full border border-[#7a2550] bg-[#3d1a2a] px-3 py-1 text-xs font-semibold text-[#ff6bb5]">
+              {formatCategory(activeCategory)}
             </span>
-
-            {onReplace ? (
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                disabled={replacing}
-                onClick={onReplace}
-              >
-                {replacing ? "Removing..." : "Replace file"}
-              </Button>
-            ) : null}
+            {confidenceLabel ? <span className="text-xs text-[#ad6883]">{confidenceLabel}</span> : null}
           </div>
 
           {document?.extraction_status === "processing" ? (
-            <div className="mt-3 space-y-2">
+            <div className="mt-4 space-y-2">
               <div className="flex items-center gap-2 text-xs text-[#ad6883]">
                 <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-[#ad6883]/30 border-t-[#ad6883]" />
-                <span>Extracting full document...</span>
+                <span>{stageLabel(document)}</span>
               </div>
               {(activeFileSize || 0) > 5_000_000 ? (
-                <div className="rounded-lg border border-amber-800 bg-amber-950 px-3 py-2 text-xs text-amber-300">
-                  Large document detected - extracting in background. You can continue uploading other documents.
+                <div className="rounded-lg border border-amber-900/70 bg-amber-950/40 px-3 py-2 text-xs text-amber-300">
+                  Large document detected. Extraction is still running in the background.
                 </div>
               ) : null}
             </div>
           ) : null}
 
           {document?.extraction_status === "extracted" ? (
-            <div className="mt-3 flex items-center gap-2 text-xs text-green-300">
-              <span className="h-2 w-2 rounded-full bg-green-400" />
+            <div className="mt-4 flex items-center gap-2 text-xs text-emerald-300">
+              <span className="h-2 w-2 rounded-full bg-emerald-400" />
               <span>Ready for schema</span>
             </div>
           ) : null}
 
           {document?.extraction_status === "extraction_failed" ? (
-            <div className="mt-3 rounded-lg border border-amber-800 bg-amber-950 px-3 py-2 text-xs text-amber-300">
-              Extraction incomplete - some fields may need manual entry
+            <div className="mt-4 rounded-lg border border-amber-900/70 bg-amber-950/40 px-3 py-2 text-xs text-amber-300">
+              Extraction completed partially. Some fields may need manual entry later.
             </div>
+          ) : null}
+
+          {onReplace ? (
+            <button
+              type="button"
+              disabled={replacing}
+              onClick={onReplace}
+              className="mt-auto rounded-lg border border-[#7a2550] px-3 py-2 text-sm font-medium text-[#f48fb1] transition-colors hover:bg-[#3d1a2a] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {replacing ? "Removing..." : "Replace file"}
+            </button>
           ) : null}
         </div>
       ) : null}

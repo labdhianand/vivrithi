@@ -1,13 +1,14 @@
 GST_RETURNS_DEFAULT_SCHEMA = {
     "category": "GST_Returns",
     "fields": [
-        {"key": "gstin", "label": "GSTIN", "type": "string", "required": True},
-        {"key": "filing_period", "label": "Filing Period", "type": "string", "required": True},
-        {"key": "turnover_reported", "label": "Turnover Reported", "type": "currency_crore", "required": True},
-        {"key": "tax_liability", "label": "Tax Liability", "type": "currency_lakhs", "required": False},
-        {"key": "itc_claimed", "label": "Input Tax Credit Claimed", "type": "currency_lakhs", "required": False},
-        {"key": "gst_status", "label": "GST Compliance Status", "type": "string", "required": True},
-        {"key": "filing_date", "label": "Date of Filing", "type": "date", "required": False},
-        {"key": "return_type", "label": "Return Type (GSTR-1/3B/2A)", "type": "string", "required": False},
+        {"key": "gstin", "label": "GSTIN", "type": "text", "required": True},
+        {"key": "filing_period", "label": "Filing Period", "type": "text", "required": True},
+        {"key": "gross_turnover", "label": "Gross Turnover", "type": "number", "required": True},
+        {"key": "taxable_turnover", "label": "Taxable Turnover", "type": "number", "required": True},
+        {"key": "cgst", "label": "CGST", "type": "number", "required": False},
+        {"key": "sgst", "label": "SGST", "type": "number", "required": False},
+        {"key": "igst", "label": "IGST", "type": "number", "required": False},
+        {"key": "input_tax_credit_claimed", "label": "Input Tax Credit Claimed", "type": "number", "required": False},
+        {"key": "net_tax_payable", "label": "Net Tax Payable", "type": "number", "required": False},
     ],
 }

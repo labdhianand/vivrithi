@@ -38,7 +38,7 @@ export default function LandingPage() {
 
         <button
           type="button"
-          onClick={() => router.push("/onboarding")}
+          onClick={() => router.push("/dashboard")}
           className="mt-10 inline-flex items-center justify-center rounded-2xl bg-[#e91e8c] px-8 py-4 text-lg font-semibold text-white shadow-[0_20px_44px_rgba(233,30,140,0.28)] transition-all hover:scale-[1.02] hover:bg-[#c4187a]"
         >
           Start New Application

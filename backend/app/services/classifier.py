@@ -16,6 +16,7 @@ ALLOWED_CATEGORIES = (
     "Annual_Report",
     "Portfolio_Performance",
     "GST_Returns",
+    "ITR",
     "Bank_Statement",
 )
 
@@ -34,6 +35,11 @@ CATEGORY_ALIASES = {
     "gst returns": "GST_Returns",
     "gst return": "GST_Returns",
     "gstr": "GST_Returns",
+    "itr": "ITR",
+    "income tax return": "ITR",
+    "income tax returns": "ITR",
+    "itr acknowledgement": "ITR",
+    "itr acknowledgment": "ITR",
     "bank statement": "Bank_Statement",
     "bank statements": "Bank_Statement",
     "account statement": "Bank_Statement",
@@ -110,6 +116,16 @@ CATEGORY_PATTERNS = {
         r"taxable turnover",
         r"filing period",
     ],
+    "ITR": [
+        r"\bitr\b",
+        r"income tax return",
+        r"assessment year",
+        r"gross total income",
+        r"taxable income",
+        r"refund due",
+        r"acknowledg(e)?ment number",
+        r"\bpan\b",
+    ],
     "Bank_Statement": [
         r"bank statement",
         r"account statement",
@@ -159,6 +175,12 @@ FILENAME_PATTERNS = {
         r"gstr",
         r"gstin",
     ],
+    "ITR": [
+        r"\bitr\b",
+        r"income[_ -]?tax[_ -]?return",
+        r"assessment[_ -]?year",
+        r"acknowledg(e)?ment",
+    ],
     "Bank_Statement": [
         r"bank[_ -]?statement",
         r"account[_ -]?statement",
@@ -186,6 +208,10 @@ PAGE_SIGNAL_PATTERNS = {
     "Portfolio_Performance": {
         "financial_table": 1.4,
         "narrative": 0.5,
+    },
+    "ITR": {
+        "financial_table": 0.8,
+        "narrative": 0.8,
     },
 }
 
@@ -223,6 +249,27 @@ STRONG_SIGNAL_PATTERNS = {
         r"statement of profit and loss",
         r"gross npa",
         r"capital adequacy",
+    ],
+    "GST_Returns": [
+        r"\bgstr?\b",
+        r"\bgstin\b",
+        r"goods and services tax",
+        r"input tax credit",
+        r"taxable turnover",
+    ],
+    "ITR": [
+        r"\bitr\b",
+        r"income tax return",
+        r"assessment year",
+        r"gross total income",
+        r"taxable income",
+    ],
+    "Bank_Statement": [
+        r"bank statement",
+        r"account statement",
+        r"opening balance",
+        r"closing balance",
+        r"total credits",
     ],
 }
 
@@ -336,6 +383,24 @@ def _strong_signal_classify(text: str, filename: str | None = None) -> Classific
             confidence=0.97,
             reasoning="Filename explicitly identifies an LCR or liquidity disclosure.",
         )
+    if "gst" in filename_lowered or "gstr" in filename_lowered:
+        return ClassificationResult(
+            category="GST_Returns",
+            confidence=0.97,
+            reasoning="Filename explicitly identifies a GST filing or GSTR return.",
+        )
+    if re.search(r"\bitr\b", filename_lowered) or "income tax return" in filename_lowered:
+        return ClassificationResult(
+            category="ITR",
+            confidence=0.97,
+            reasoning="Filename explicitly identifies an income tax return document.",
+        )
+    if "bank" in filename_lowered and "statement" in filename_lowered:
+        return ClassificationResult(
+            category="Bank_Statement",
+            confidence=0.97,
+            reasoning="Filename explicitly identifies a bank statement.",
+        )
     if "financial_result" in filename_lowered or "financial result" in filename_lowered:
         return ClassificationResult(
             category="Portfolio_Performance",
@@ -395,19 +460,25 @@ async def classify_document(
             (
                 "Classify this Indian corporate credit document into exactly one of: "
                 "ALM, Shareholding_Pattern, Borrowing_Profile, Annual_Report, "
-                "Portfolio_Performance.\n\n"
+                "Portfolio_Performance, GST_Returns, ITR, Bank_Statement.\n\n"
                 "Definitions:\n"
                 "- ALM: liquidity coverage ratio, HQLA, net cash outflows, ALM or liquidity disclosures.\n"
                 "- Shareholding_Pattern: regulation 31 shareholding tables, promoter/public holdings.\n"
                 "- Borrowing_Profile: credit rating letters, sanction letters, lender facilities, debt borrowing details.\n"
                 "- Annual_Report: annual or integrated reports with board's report, management discussion, financial statements.\n"
-                "- Portfolio_Performance: quarterly financial results, board meeting outcomes, portfolio cuts, GNPA/NNPA/PAR/AUM performance.\n\n"
+                "- Portfolio_Performance: quarterly financial results, board meeting outcomes, portfolio cuts, GNPA/NNPA/PAR/AUM performance.\n"
+                "- GST_Returns: GST filings, GSTR forms, GSTIN, taxable turnover, input tax credit and tax payable details.\n"
+                "- ITR: Income Tax Return documents, acknowledgements, assessment year, taxable income, refund or tax paid details.\n"
+                "- Bank_Statement: bank account statements with account holder, balances, credits, debits and transaction summaries.\n\n"
                 "Rules:\n"
                 "- Quarterly financial results or board meeting outcome documents must be Portfolio_Performance even if Regulation 52 debt disclosures appear.\n"
                 "- Credit rating assignment or reaffirmation letters must be Borrowing_Profile.\n"
                 "- Shareholding filings under Regulation 31 must be Shareholding_Pattern.\n"
                 "- LCR or liquidity disclosure documents must be ALM.\n"
-                "- Annual or integrated reports must be Annual_Report.\n\n"
+                "- Annual or integrated reports must be Annual_Report.\n"
+                "- GST filings and GSTR forms must be GST_Returns.\n"
+                "- Income tax return filings or acknowledgements must be ITR.\n"
+                "- Bank account statements must be Bank_Statement.\n\n"
                 "Return strict JSON only with keys category, confidence, reasoning. "
                 "confidence must be a numeric value between 0 and 1.\n\n"
                 f"Filename: {filename or 'unknown'}\n"
